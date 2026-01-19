@@ -1,9 +1,9 @@
 /**
  * API client for Pricer backend.
- * Communicates with FastAPI server on port 8000.
+ * Communicates with FastAPI server.
  */
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://pricer-api-o6kd.onrender.com';
 
 // Types
 export interface RunConfig {
