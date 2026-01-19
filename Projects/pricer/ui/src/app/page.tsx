@@ -65,26 +65,63 @@ export default function PricingPage() {
             // Fetch live market data
             const marketData = await fetchMarketData(tickers);
 
-            // Update term sheet with live data
-            const today = new Date().toISOString().split('T')[0];
-            parsed.meta = { ...parsed.meta, valuation_date: today };
+            // Calculate date shift: from old valuation_date to today
+            const oldValDate = new Date(parsed.meta?.valuation_date || new Date());
+            const today = new Date();
+            const dayShift = Math.round((today.getTime() - oldValDate.getTime()) / (1000 * 60 * 60 * 24));
+
+            // Helper to shift a date string by dayShift days
+            const shiftDate = (dateStr: string): string => {
+                const d = new Date(dateStr);
+                d.setDate(d.getDate() + dayShift);
+                return d.toISOString().split('T')[0];
+            };
+
+            // Update meta dates
+            const todayStr = today.toISOString().split('T')[0];
+            parsed.meta = {
+                ...parsed.meta,
+                valuation_date: todayStr,
+                trade_date: shiftDate(parsed.meta?.trade_date || todayStr),
+                settlement_date: shiftDate(parsed.meta?.settlement_date || todayStr),
+                maturity_date: shiftDate(parsed.meta?.maturity_date || todayStr),
+                maturity_payment_date: shiftDate(parsed.meta?.maturity_payment_date || todayStr),
+            };
+
             parsed.discount_curve = { ...parsed.discount_curve, flat_rate: marketData.risk_free_rate };
+
+            // Update schedules dates
+            if (parsed.schedules) {
+                if (parsed.schedules.observation_dates) {
+                    parsed.schedules.observation_dates = parsed.schedules.observation_dates.map(shiftDate);
+                }
+                if (parsed.schedules.payment_dates) {
+                    parsed.schedules.payment_dates = parsed.schedules.payment_dates.map(shiftDate);
+                }
+            }
 
             // Update each underlying
             for (const underlying of parsed.underlyings || []) {
                 const data = marketData.underlyings[underlying.id];
                 if (data) {
                     underlying.spot = data.spot;
-                    // Update vol term structure with historical vol
+                    // Update vol term structure with historical vol and shifted dates
                     if (underlying.vol_model?.term_structure) {
                         underlying.vol_model.term_structure = underlying.vol_model.term_structure.map((v: any) => ({
-                            ...v,
+                            date: shiftDate(v.date),
                             vol: data.historical_vol
                         }));
                     }
                     // Update dividend yield if continuous
                     if (underlying.dividend_model?.type === 'continuous') {
                         underlying.dividend_model.continuous_yield = data.dividend_yield || 0;
+                    }
+                    // Shift discrete dividend dates
+                    if (underlying.dividend_model?.discrete_dividends) {
+                        underlying.dividend_model.discrete_dividends = underlying.dividend_model.discrete_dividends.map((d: any) => ({
+                            ...d,
+                            ex_date: shiftDate(d.ex_date)
+                        }));
                     }
                 }
             }
