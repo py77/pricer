@@ -276,6 +276,9 @@ class PathGenerator:
         num_steps = self.grid.num_steps
         self.vols = np.zeros((num_steps + 1, self.num_assets))
         
+        # Track which assets use LSV
+        self.lsv_assets = []  # List of (asset_idx, LSVParams)
+        
         for a_idx, underlying in enumerate(self.ts.underlyings):
             vol_model = underlying.vol_model
             
@@ -293,6 +296,16 @@ class PathGenerator:
                             vol = tenor.vol
                             break
                     self.vols[step_idx, a_idx] = vol
+            
+            elif vol_model.type == VolModelType.LOCAL_STOCHASTIC:
+                # LSV: store params, initial vol from sqrt(v0)
+                params = vol_model.lsv_params
+                if params is None:
+                    from pricer.products.schema import LSVParams
+                    params = LSVParams()
+                self.lsv_assets.append((a_idx, params))
+                # Use sqrt(v0) as initial deterministic vol (will be overwritten during simulation)
+                self.vols[:, a_idx] = np.sqrt(params.v0)
     
     def _build_dividend_arrays(self) -> None:
         """Build discrete dividend schedules."""
@@ -356,6 +369,14 @@ class PathGenerator:
         # For Brownian bridge KI, also need uniform draws for probabilistic check
         U_ki = rng.uniform(0, 1, (num_paths, num_steps, num_assets)).astype(dtype)
         
+        # LSV: Initialize variance paths and generate additional randoms for variance
+        variance = np.zeros((num_paths, num_assets), dtype=dtype)
+        Z_var = None
+        if self.lsv_assets:
+            Z_var = rng.standard_normal((num_paths, num_steps, len(self.lsv_assets))).astype(dtype)
+            for lsv_idx, (a_idx, params) in enumerate(self.lsv_assets):
+                variance[:, a_idx] = params.v0
+        
         # Correlate: Z_corr = Z @ L^T where L is lower Cholesky
         Z_corr = np.einsum('ijk,lk->ijl', Z, self.cholesky)
         
@@ -370,10 +391,71 @@ class PathGenerator:
             sqrt_dt = np.sqrt(dt)
             
             # Get vol for this step (use step+1 date's vol)
-            vol = self.vols[step + 1, :]  # [num_assets]
+            vol = self.vols[step + 1, :].copy()  # [num_assets]
+            
+            # LSV: Update variance and use sqrt(V) as vol for LSV assets
+            if self.lsv_assets:
+                for lsv_idx, (a_idx, params) in enumerate(self.lsv_assets):
+                    V = variance[:, a_idx]
+                    
+                    # QE (Quadratic Exponential) scheme for variance
+                    # Reference: Andersen (2008)
+                    kappa, theta, xi = params.kappa, params.theta, params.xi
+                    rho = params.rho
+                    
+                    # Exp decay
+                    exp_kappa_dt = np.exp(-kappa * dt)
+                    
+                    # Mean and variance of V(t+dt) given V(t)
+                    m = theta + (V - theta) * exp_kappa_dt
+                    s2 = V * xi**2 * exp_kappa_dt * (1 - exp_kappa_dt) / kappa
+                    s2 += theta * xi**2 * (1 - exp_kappa_dt)**2 / (2 * kappa)
+                    s2 = np.maximum(s2, 1e-10)  # Ensure positive
+                    
+                    # Psi = s2 / m^2
+                    psi = s2 / np.maximum(m**2, 1e-10)
+                    
+                    # QE switching threshold
+                    psi_c = 1.5
+                    
+                    # Generate uniform for inverse CDF
+                    U_v = rng.uniform(0, 1, num_paths).astype(dtype)
+                    
+                    # Case 1: psi <= psi_c (use moment matching)
+                    mask_low = psi <= psi_c
+                    b2 = np.where(mask_low, 2 / psi - 1 + np.sqrt(2 / psi) * np.sqrt(2 / psi - 1), 0)
+                    b2 = np.maximum(b2, 0)
+                    a = np.where(mask_low, m / (1 + b2), 0)
+                    V_new_low = a * (np.sqrt(b2) + Z_var[:, step, lsv_idx])**2
+                    
+                    # Case 2: psi > psi_c (use exponential approximation)
+                    p = np.where(~mask_low, (psi - 1) / (psi + 1), 0)
+                    beta = np.where(~mask_low, (1 - p) / np.maximum(m, 1e-10), 0)
+                    V_new_high = np.where(
+                        U_v <= p,
+                        0,
+                        np.log((1 - p) / np.maximum(1 - U_v, 1e-10)) / np.maximum(beta, 1e-10)
+                    )
+                    
+                    # Combine
+                    V_new = np.where(mask_low, V_new_low, V_new_high)
+                    V_new = np.maximum(V_new, 1e-10)  # Floor at small positive
+                    
+                    variance[:, a_idx] = V_new
+                    
+                    # Use average vol for this step (trapezoidal)
+                    vol_step = np.sqrt(0.5 * (V + V_new))
+                    
+                    # Override vol array for this asset
+                    vol = np.broadcast_to(vol, (num_paths, num_assets)).copy()
+                    vol[:, a_idx] = vol_step
+                    
+                    # Adjust spot diffusion for spot-vol correlation
+                    # dS = ... + rho * (xi/sqrt(V)) * S * dV_normalized
+                    # Already handled via correlation in Z_corr if assets are correlated
             
             # Drift: r - q - 0.5*vol^2
-            drift = r - self.cont_yields - 0.5 * vol * vol  # [num_assets]
+            drift = r - self.cont_yields - 0.5 * vol * vol  # [num_assets] or [num_paths, num_assets]
             
             # Log return
             log_return = drift * dt + vol * sqrt_dt * Z_corr[:, step, :]
@@ -397,7 +479,11 @@ class PathGenerator:
                 # Check each asset
                 for a_idx in range(num_assets):
                     barrier = self.ki_barriers[a_idx]
-                    v = vol[a_idx]
+                    # Handle both 1D and 2D vol arrays
+                    if vol.ndim == 1:
+                        v = vol[a_idx]
+                    else:
+                        v = vol[:, a_idx]
                     
                     # Compute hit probability
                     hit_prob = brownian_bridge_hit_probability(

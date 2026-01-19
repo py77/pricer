@@ -50,6 +50,7 @@ class VolModelType(str, Enum):
     """Volatility model types."""
     FLAT = "flat"
     PIECEWISE_CONSTANT = "piecewise_constant"
+    LOCAL_STOCHASTIC = "local_stochastic"
 
 
 class BarrierMonitoringType(str, Enum):
@@ -107,6 +108,48 @@ class VolTenor(BaseModel):
     vol: float = Field(..., gt=0, le=2.0, description="Volatility (e.g., 0.25 for 25%)")
 
 
+class LSVParams(BaseModel):
+    """
+    Local Stochastic Volatility (Heston-style) parameters.
+    
+    The variance follows: dV = kappa*(theta - V)*dt + xi*sqrt(V)*dW
+    """
+    v0: float = Field(
+        default=0.04, gt=0, le=4.0,
+        description="Initial variance (e.g., 0.04 = 20% vol)"
+    )
+    theta: float = Field(
+        default=0.04, gt=0, le=4.0,
+        description="Long-run variance"
+    )
+    kappa: float = Field(
+        default=2.0, gt=0, le=20.0,
+        description="Mean reversion speed"
+    )
+    xi: float = Field(
+        default=0.3, gt=0, le=2.0,
+        description="Volatility of variance (vol-of-vol)"
+    )
+    rho: float = Field(
+        default=-0.7, ge=-1.0, le=1.0,
+        description="Correlation between spot and variance"
+    )
+    
+    @model_validator(mode='after')
+    def validate_feller(self) -> 'LSVParams':
+        """Validate Feller condition for non-negative variance."""
+        # Feller condition: 2*kappa*theta >= xi^2
+        feller_lhs = 2 * self.kappa * self.theta
+        feller_rhs = self.xi ** 2
+        if feller_lhs < feller_rhs:
+            import warnings
+            warnings.warn(
+                f"Feller condition not satisfied: 2*kappa*theta={feller_lhs:.4f} < xi^2={feller_rhs:.4f}. "
+                "Variance may become negative. Consider using truncation scheme."
+            )
+        return self
+
+
 class VolModel(BaseModel):
     """Volatility model specification."""
     type: VolModelType
@@ -118,6 +161,10 @@ class VolModel(BaseModel):
         default=None,
         description="Piecewise constant vol term structure"
     )
+    lsv_params: Optional[LSVParams] = Field(
+        default=None,
+        description="Local stochastic volatility parameters (Heston-style)"
+    )
     
     @model_validator(mode='after')
     def validate_vol_model(self) -> 'VolModel':
@@ -128,6 +175,10 @@ class VolModel(BaseModel):
         elif self.type == VolModelType.PIECEWISE_CONSTANT:
             if not self.term_structure:
                 raise ValueError("term_structure required for piecewise constant vol model")
+        elif self.type == VolModelType.LOCAL_STOCHASTIC:
+            if self.lsv_params is None:
+                # Use defaults if not provided
+                self.lsv_params = LSVParams()
         return self
 
 
