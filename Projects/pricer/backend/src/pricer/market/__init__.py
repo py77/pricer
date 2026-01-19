@@ -1,21 +1,29 @@
-"""Market data components: rates, volatility, dividends, correlation."""
+"""Market data package for fetching live prices and computing vol/correlations."""
 
-from pricer.market.rates import RateCurve, FlatRateCurve, PiecewiseConstantRateCurve
-from pricer.market.volatility import VolatilitySurface, PiecewiseConstantVol
-from pricer.market.dividends import DividendModel, ContinuousDividend, DiscreteDividend
-from pricer.market.correlation import CorrelationMatrix
-from pricer.market.market_data import MarketData, Underlying
+from .market_data import (
+    fetch_spot_prices,
+    fetch_historical_vol,
+    fetch_dividends,
+    fetch_correlations,
+    fetch_risk_free_rate,
+    fetch_market_data_snapshot,
+    MarketDataSnapshot,
+    MarketData,
+    UnderlyingMarketData,
+    DividendInfo,
+    VolInfo,
+)
 
 __all__ = [
-    "RateCurve",
-    "FlatRateCurve",
-    "PiecewiseConstantRateCurve",
-    "VolatilitySurface",
-    "PiecewiseConstantVol",
-    "DividendModel",
-    "ContinuousDividend",
-    "DiscreteDividend",
-    "CorrelationMatrix",
+    "fetch_spot_prices",
+    "fetch_historical_vol",
+    "fetch_dividends",
+    "fetch_correlations",
+    "fetch_risk_free_rate",
+    "fetch_market_data_snapshot",
+    "MarketDataSnapshot",
     "MarketData",
-    "Underlying",
+    "UnderlyingMarketData",
+    "DividendInfo",
+    "VolInfo",
 ]

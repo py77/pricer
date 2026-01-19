@@ -1,198 +1,360 @@
 """
-Aggregated market data container.
+Market data fetcher using Yahoo Finance.
 
-Bundles all market data required for pricing into a single object.
+Provides functions to fetch:
+- Spot prices
+- Historical volatility
+- Dividends
+- Correlations
+- Risk-free rates
 """
 
 from dataclasses import dataclass, field
-from datetime import date
-from typing import Dict, Optional, Any, List
-import math
+from datetime import date, datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+import numpy as np
 
-from pricer.core.day_count import DayCountConvention, day_count_fraction
-from pricer.market.rates import RateCurve, FlatRateCurve
-from pricer.market.volatility import VolatilitySurface, FlatVolatility, PiecewiseConstantVol
-from pricer.market.dividends import DividendModel, ContinuousDividend, DiscreteDividend
-from pricer.market.correlation import CorrelationMatrix
+try:
+    import yfinance as yf
+    HAS_YFINANCE = True
+except ImportError:
+    HAS_YFINANCE = False
 
 
 @dataclass
-class Underlying:
-    """
-    Market data for a single underlying asset.
-    
-    Attributes:
-        ticker: Asset identifier
-        spot: Current spot price
-        vol_surface: Volatility surface/term structure
-        dividend_model: Dividend model
-        currency: Currency code (e.g., "USD", "EUR")
-    """
-    
+class DividendInfo:
+    """Dividend information for a stock."""
+    ex_date: date
+    amount: float
+
+
+@dataclass
+class VolInfo:
+    """Volatility term structure entry."""
+    date: date
+    vol: float
+
+
+@dataclass
+class UnderlyingMarketData:
+    """Market data for a single underlying."""
     ticker: str
     spot: float
-    vol_surface: VolatilitySurface
-    dividend_model: DividendModel = field(default_factory=ContinuousDividend)
     currency: str = "USD"
-    
-    def get_forward(
-        self,
-        reference_date: date,
-        target_date: date,
-        rate_curve: RateCurve
-    ) -> float:
-        """Calculate forward price at target date."""
-        if target_date <= reference_date:
-            return self.spot
-        
-        # F = S * exp((r - q) * t) for continuous yield
-        # Or F = S * exp(r*t) * div_adjustment for discrete divs
-        
-        df = rate_curve.discount_factor(reference_date, target_date)
-        div_adj = self.dividend_model.get_dividend_adjustment(
-            reference_date, target_date, self.spot
-        )
-        
-        return self.spot * div_adj / df
+    historical_vol: float = 0.25
+    vol_term_structure: List[VolInfo] = field(default_factory=list)
+    dividends: List[DividendInfo] = field(default_factory=list)
+    dividend_yield: float = 0.0
 
 
 @dataclass
-class MarketData:
+class MarketDataSnapshot:
+    """Complete market data snapshot for multiple underlyings."""
+    as_of_date: date
+    underlyings: Dict[str, UnderlyingMarketData] = field(default_factory=dict)
+    correlations: Dict[str, float] = field(default_factory=dict)
+    risk_free_rate: float = 0.05
+
+
+# Alias for backwards compatibility with existing engine interfaces
+MarketData = MarketDataSnapshot
+
+
+def _check_yfinance():
+    """Check if yfinance is available."""
+    if not HAS_YFINANCE:
+        raise ImportError(
+            "yfinance is required for market data. Install with: pip install yfinance"
+        )
+
+
+def fetch_spot_prices(tickers: List[str]) -> Dict[str, float]:
     """
-    Complete market data for pricing.
+    Fetch current spot prices for given tickers.
     
-    Aggregates all market observables: spots, vols, rates, dividends, correlations.
-    
-    Attributes:
-        valuation_date: Pricing date
-        underlyings: Dict of underlying assets by ticker
-        rate_curve: Interest rate curve for discounting
-        correlation: Correlation matrix for multi-asset
+    Args:
+        tickers: List of stock tickers (e.g., ["AAPL", "GOOG", "MSFT"])
+        
+    Returns:
+        Dictionary mapping ticker to current price
     """
+    _check_yfinance()
     
-    valuation_date: date
-    underlyings: Dict[str, Underlying] = field(default_factory=dict)
-    rate_curve: RateCurve = field(default_factory=lambda: FlatRateCurve(rate=0.05))
-    correlation: Optional[CorrelationMatrix] = None
-    
-    def __post_init__(self) -> None:
-        """Initialize correlation matrix if not provided."""
-        if self.correlation is None and self.underlyings:
-            assets = list(self.underlyings.keys())
-            self.correlation = CorrelationMatrix.identity(assets)
-    
-    def get_spot(self, ticker: str) -> float:
-        """Get spot price for an underlying."""
-        if ticker not in self.underlyings:
-            raise KeyError(f"Unknown underlying: {ticker}")
-        return self.underlyings[ticker].spot
-    
-    def get_spots(self, tickers: List[str]) -> Dict[str, float]:
-        """Get spots for multiple underlyings."""
-        return {ticker: self.get_spot(ticker) for ticker in tickers}
-    
-    def get_vol(
-        self,
-        ticker: str,
-        expiry: date,
-        strike: Optional[float] = None
-    ) -> float:
-        """Get implied volatility for an underlying."""
-        if ticker not in self.underlyings:
-            raise KeyError(f"Unknown underlying: {ticker}")
-        return self.underlyings[ticker].vol_surface.get_vol(
-            self.valuation_date, expiry, strike
-        )
-    
-    def get_forward(self, ticker: str, target_date: date) -> float:
-        """Get forward price for an underlying."""
-        if ticker not in self.underlyings:
-            raise KeyError(f"Unknown underlying: {ticker}")
-        return self.underlyings[ticker].get_forward(
-            self.valuation_date, target_date, self.rate_curve
-        )
-    
-    def discount_factor(self, target_date: date) -> float:
-        """Get discount factor to target date."""
-        return self.rate_curve.discount_factor(self.valuation_date, target_date)
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "MarketData":
-        """
-        Create MarketData from a dictionary specification.
-        
-        Expected format:
-        {
-            "valuation_date": "2024-01-15",
-            "rate": 0.05,  # or "rate_curve": [...]
-            "underlyings": {
-                "AAPL": {
-                    "spot": 180.0,
-                    "vol": 0.25,  # or "vol_term": [...]
-                    "div_yield": 0.01,  # or "dividends": [...]
-                    "currency": "USD"
-                },
-                ...
-            },
-            "correlations": {"AAPL_GOOG": 0.6, ...}
-        }
-        """
-        val_date = date.fromisoformat(data["valuation_date"])
-        
-        # Parse rate curve
-        if "rate" in data:
-            rate_curve = FlatRateCurve(rate=data["rate"])
-        else:
-            rate_curve = FlatRateCurve(rate=0.05)  # Default
-        
-        # Parse underlyings
-        underlyings: Dict[str, Underlying] = {}
-        underlying_data = data.get("underlyings", {})
-        
-        for ticker, udata in underlying_data.items():
-            # Vol
-            if "vol" in udata:
-                vol_surface: VolatilitySurface = FlatVolatility(vol=udata["vol"])
-            elif "vol_term" in udata:
-                tenors = [
-                    (date.fromisoformat(t["date"]), t["vol"])
-                    for t in udata["vol_term"]
-                ]
-                vol_surface = PiecewiseConstantVol(tenors=tenors)
-            else:
-                vol_surface = FlatVolatility(vol=0.20)  # Default 20%
+    prices = {}
+    for ticker in tickers:
+        try:
+            stock = yf.Ticker(ticker)
+            # Try fast_info first, fall back to info
+            try:
+                price = stock.fast_info.last_price
+            except:
+                info = stock.info
+                price = info.get("regularMarketPrice") or info.get("currentPrice")
             
-            # Dividends
-            if "div_yield" in udata:
-                div_model: DividendModel = ContinuousDividend(
-                    yield_rate=udata["div_yield"]
-                )
-            elif "dividends" in udata:
-                divs = [
-                    (date.fromisoformat(d["ex_date"]), d["amount"])
-                    for d in udata["dividends"]
-                ]
-                div_model = DiscreteDividend(dividends=divs)
-            else:
-                div_model = ContinuousDividend(yield_rate=0.0)
+            if price:
+                prices[ticker] = float(price)
+        except Exception as e:
+            print(f"Warning: Could not fetch price for {ticker}: {e}")
+    
+    return prices
+
+
+def fetch_historical_vol(
+    ticker: str, 
+    window_days: int = 30,
+    annualization_factor: float = 252.0
+) -> float:
+    """
+    Calculate annualized historical volatility from daily returns.
+    
+    Args:
+        ticker: Stock ticker
+        window_days: Number of trading days for calculation
+        annualization_factor: Trading days per year (default 252)
+        
+    Returns:
+        Annualized volatility as decimal (e.g., 0.25 for 25%)
+    """
+    _check_yfinance()
+    
+    stock = yf.Ticker(ticker)
+    # Fetch enough data for the window
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=int(window_days * 1.5) + 10)
+    
+    hist = stock.history(start=start_date, end=end_date)
+    
+    if len(hist) < window_days:
+        raise ValueError(f"Not enough history for {ticker}: got {len(hist)} days")
+    
+    # Use the most recent window_days
+    close_prices = hist["Close"].tail(window_days + 1)
+    
+    # Calculate log returns
+    log_returns = np.log(close_prices / close_prices.shift(1)).dropna()
+    
+    # Annualized volatility
+    daily_vol = log_returns.std()
+    annualized_vol = daily_vol * np.sqrt(annualization_factor)
+    
+    return float(annualized_vol)
+
+
+def fetch_dividends(
+    ticker: str, 
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None
+) -> List[DividendInfo]:
+    """
+    Fetch dividend information for a stock.
+    
+    Args:
+        ticker: Stock ticker
+        start_date: Optional start date filter
+        end_date: Optional end date filter
+        
+    Returns:
+        List of DividendInfo with ex-dates and amounts
+    """
+    _check_yfinance()
+    
+    stock = yf.Ticker(ticker)
+    
+    # Get dividend history
+    try:
+        divs = stock.dividends
+    except:
+        return []
+    
+    if divs.empty:
+        return []
+    
+    result = []
+    for idx, amount in divs.items():
+        ex_date = idx.date() if hasattr(idx, 'date') else idx
+        
+        # Filter by date range
+        if start_date and ex_date < start_date:
+            continue
+        if end_date and ex_date > end_date:
+            continue
             
-            underlyings[ticker] = Underlying(
-                ticker=ticker,
-                spot=udata["spot"],
-                vol_surface=vol_surface,
-                dividend_model=div_model,
-                currency=udata.get("currency", "USD")
-            )
+        result.append(DividendInfo(ex_date=ex_date, amount=float(amount)))
+    
+    return result
+
+
+def fetch_correlations(
+    tickers: List[str], 
+    window_days: int = 60
+) -> Dict[str, float]:
+    """
+    Calculate pairwise correlations from historical returns.
+    
+    Args:
+        tickers: List of stock tickers
+        window_days: Number of trading days for calculation
         
-        # Parse correlations
-        correlation = None
-        if "correlations" in data and len(underlyings) > 1:
-            assets = list(underlyings.keys())
-            correlation = CorrelationMatrix.from_dict(assets, data["correlations"])
+    Returns:
+        Dictionary with keys like "AAPL_GOOG" and correlation values
+    """
+    _check_yfinance()
+    
+    if len(tickers) < 2:
+        return {}
+    
+    # Fetch historical data
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=int(window_days * 1.5) + 10)
+    
+    # Collect returns for each ticker
+    returns_data = {}
+    for ticker in tickers:
+        try:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(start=start_date, end=end_date)
+            if len(hist) > window_days:
+                close = hist["Close"].tail(window_days + 1)
+                returns = np.log(close / close.shift(1)).dropna()
+                returns_data[ticker] = returns
+        except Exception as e:
+            print(f"Warning: Could not fetch history for {ticker}: {e}")
+    
+    # Calculate pairwise correlations
+    correlations = {}
+    ticker_list = list(returns_data.keys())
+    
+    for i in range(len(ticker_list)):
+        for j in range(i + 1, len(ticker_list)):
+            t1, t2 = ticker_list[i], ticker_list[j]
+            
+            # Align dates
+            returns1 = returns_data[t1]
+            returns2 = returns_data[t2]
+            
+            # Get common dates
+            common_idx = returns1.index.intersection(returns2.index)
+            if len(common_idx) < 20:
+                continue
+                
+            r1 = returns1.loc[common_idx]
+            r2 = returns2.loc[common_idx]
+            
+            corr = np.corrcoef(r1, r2)[0, 1]
+            key = f"{t1}_{t2}"
+            correlations[key] = float(corr)
+    
+    return correlations
+
+
+def fetch_risk_free_rate() -> float:
+    """
+    Fetch current risk-free rate (3-month Treasury).
+    
+    Returns:
+        Risk-free rate as decimal (e.g., 0.05 for 5%)
+    """
+    _check_yfinance()
+    
+    try:
+        # Use 3-month Treasury Bill rate
+        irx = yf.Ticker("^IRX")
+        info = irx.fast_info
+        rate = info.last_price / 100  # Convert from percentage
+        return float(rate)
+    except:
+        # Fallback to 10-year Treasury
+        try:
+            tnx = yf.Ticker("^TNX")
+            info = tnx.fast_info
+            rate = info.last_price / 100
+            return float(rate)
+        except:
+            # Default fallback
+            return 0.05
+
+
+def fetch_market_data_snapshot(
+    tickers: List[str],
+    valuation_date: Optional[date] = None,
+    maturity_date: Optional[date] = None,
+    vol_window: int = 30,
+    corr_window: int = 60
+) -> MarketDataSnapshot:
+    """
+    Fetch complete market data snapshot for multiple underlyings.
+    
+    Args:
+        tickers: List of stock tickers
+        valuation_date: Valuation date (default: today)
+        maturity_date: Product maturity date (for vol term structure)
+        vol_window: Days for historical vol calculation
+        corr_window: Days for correlation calculation
         
-        return cls(
-            valuation_date=val_date,
-            underlyings=underlyings,
-            rate_curve=rate_curve,
-            correlation=correlation
+    Returns:
+        MarketDataSnapshot with all market data
+    """
+    _check_yfinance()
+    
+    if valuation_date is None:
+        valuation_date = date.today()
+    
+    if maturity_date is None:
+        maturity_date = valuation_date + timedelta(days=365 * 3)  # 3 years default
+    
+    # Fetch spot prices
+    spots = fetch_spot_prices(tickers)
+    
+    # Fetch risk-free rate
+    rf_rate = fetch_risk_free_rate()
+    
+    # Fetch correlations
+    correlations = fetch_correlations(tickers, corr_window)
+    
+    # Build underlying data
+    underlyings = {}
+    for ticker in tickers:
+        spot = spots.get(ticker)
+        if spot is None:
+            continue
+        
+        # Fetch historical vol
+        try:
+            hist_vol = fetch_historical_vol(ticker, vol_window)
+        except:
+            hist_vol = 0.25  # Default
+        
+        # Build simple vol term structure (flat for now)
+        vol_ts = []
+        current = valuation_date
+        while current <= maturity_date:
+            current += timedelta(days=182)  # ~6 months
+            if current <= maturity_date:
+                vol_ts.append(VolInfo(date=current, vol=hist_vol))
+        vol_ts.append(VolInfo(date=maturity_date, vol=hist_vol))
+        
+        # Fetch dividends
+        divs = fetch_dividends(ticker, valuation_date, maturity_date)
+        
+        # Calculate dividend yield
+        try:
+            stock = yf.Ticker(ticker)
+            div_yield = stock.info.get("dividendYield", 0) or 0
+        except:
+            div_yield = 0
+        
+        underlyings[ticker] = UnderlyingMarketData(
+            ticker=ticker,
+            spot=spot,
+            historical_vol=hist_vol,
+            vol_term_structure=vol_ts,
+            dividends=divs,
+            dividend_yield=float(div_yield),
         )
+    
+    return MarketDataSnapshot(
+        as_of_date=valuation_date,
+        underlyings=underlyings,
+        correlations=correlations,
+        risk_free_rate=rf_rate,
+    )

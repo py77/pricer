@@ -22,6 +22,13 @@ from pricer.reporting import (
     PVDecomposition,
 )
 
+# Market data (optional - may not be installed)
+try:
+    from pricer.market import fetch_market_data_snapshot, MarketDataSnapshot
+    HAS_MARKET_DATA = True
+except ImportError:
+    HAS_MARKET_DATA = False
+
 
 app = FastAPI(
     title="Structured Products Pricer API",
@@ -352,6 +359,86 @@ async def analyze_risk(request: RiskRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Risk analysis error: {str(e)}\n{traceback.format_exc()}"
+        )
+
+
+# ==============================================================================
+# Market Data Endpoint
+# ==============================================================================
+
+class MarketDataResponse(BaseModel):
+    """Response from /market-data endpoint."""
+    as_of_date: str
+    underlyings: Dict[str, Dict[str, Any]]
+    correlations: Dict[str, float]
+    risk_free_rate: float
+
+
+@app.get("/market-data", response_model=MarketDataResponse)
+async def get_market_data(tickers: str, maturity_years: int = 3):
+    """
+    Fetch live market data for given tickers.
+    
+    Args:
+        tickers: Comma-separated list of tickers (e.g., "AAPL,GOOG,MSFT")
+        maturity_years: Years to maturity for term structure (default 3)
+        
+    Returns:
+        Market data including spot prices, volatility, dividends, correlations
+    """
+    if not HAS_MARKET_DATA:
+        raise HTTPException(
+            status_code=501,
+            detail="Market data not available. Install yfinance: pip install yfinance"
+        )
+    
+    try:
+        ticker_list = [t.strip().upper() for t in tickers.split(",")]
+        
+        if not ticker_list:
+            raise HTTPException(status_code=400, detail="No tickers provided")
+        
+        from datetime import date, timedelta
+        valuation_date = date.today()
+        maturity_date = valuation_date + timedelta(days=365 * maturity_years)
+        
+        snapshot = fetch_market_data_snapshot(
+            ticker_list,
+            valuation_date=valuation_date,
+            maturity_date=maturity_date,
+        )
+        
+        # Convert to JSON-serializable format
+        underlyings_data = {}
+        for ticker, data in snapshot.underlyings.items():
+            underlyings_data[ticker] = {
+                "spot": data.spot,
+                "currency": data.currency,
+                "historical_vol": data.historical_vol,
+                "dividend_yield": data.dividend_yield,
+                "vol_term_structure": [
+                    {"date": v.date.isoformat(), "vol": v.vol}
+                    for v in data.vol_term_structure
+                ],
+                "dividends": [
+                    {"ex_date": d.ex_date.isoformat(), "amount": d.amount}
+                    for d in data.dividends
+                ],
+            }
+        
+        return MarketDataResponse(
+            as_of_date=snapshot.as_of_date.isoformat(),
+            underlyings=underlyings_data,
+            correlations=snapshot.correlations,
+            risk_free_rate=snapshot.risk_free_rate,
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Market data error: {str(e)}\n{traceback.format_exc()}"
         )
 
 

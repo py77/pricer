@@ -128,3 +128,33 @@ export async function analyzeRisk(
 
     return res.json();
 }
+
+// Market Data Types
+export interface MarketDataUnderlying {
+    spot: number;
+    currency: string;
+    historical_vol: number;
+    dividend_yield: number;
+    vol_term_structure: Array<{ date: string; vol: number }>;
+    dividends: Array<{ ex_date: string; amount: number }>;
+}
+
+export interface MarketDataResponse {
+    as_of_date: string;
+    underlyings: Record<string, MarketDataUnderlying>;
+    correlations: Record<string, number>;
+    risk_free_rate: number;
+}
+
+export async function fetchMarketData(tickers: string[]): Promise<MarketDataResponse> {
+    const tickerList = tickers.join(',');
+    const res = await fetch(`${API_BASE}/market-data?tickers=${encodeURIComponent(tickerList)}`);
+
+    if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.detail || `HTTP ${res.status}`);
+    }
+
+    return res.json();
+}
+

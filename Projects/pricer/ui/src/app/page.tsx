@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { priceProduct, getExampleSchema, PriceResponse, RunConfig } from '@/api/client';
+import { priceProduct, getExampleSchema, fetchMarketData, PriceResponse, RunConfig } from '@/api/client';
 
 // Dynamic import Monaco to avoid SSR issues
 const MonacoEditor = dynamic(
@@ -30,6 +30,7 @@ export default function PricingPage() {
     const [result, setResult] = useState<PriceResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [fetchingData, setFetchingData] = useState(false);
 
     // Load example on mount
     useEffect(() => {
@@ -45,6 +46,59 @@ export default function PricingPage() {
             setError(null);
         } catch (err: any) {
             setError('Failed to load example: ' + err.message);
+        }
+    };
+
+    const handleFetchLiveData = async () => {
+        setFetchingData(true);
+        setError(null);
+
+        try {
+            const parsed = JSON.parse(termSheet);
+
+            // Extract tickers from term sheet
+            const tickers: string[] = (parsed.underlyings || []).map((u: any) => u.id);
+            if (tickers.length === 0) {
+                throw new Error('No underlyings found in term sheet');
+            }
+
+            // Fetch live market data
+            const marketData = await fetchMarketData(tickers);
+
+            // Update term sheet with live data
+            const today = new Date().toISOString().split('T')[0];
+            parsed.meta = { ...parsed.meta, valuation_date: today };
+            parsed.discount_curve = { ...parsed.discount_curve, flat_rate: marketData.risk_free_rate };
+
+            // Update each underlying
+            for (const underlying of parsed.underlyings || []) {
+                const data = marketData.underlyings[underlying.id];
+                if (data) {
+                    underlying.spot = data.spot;
+                    // Update vol term structure with historical vol
+                    if (underlying.vol_model?.term_structure) {
+                        underlying.vol_model.term_structure = underlying.vol_model.term_structure.map((v: any) => ({
+                            ...v,
+                            vol: data.historical_vol
+                        }));
+                    }
+                    // Update dividend yield if continuous
+                    if (underlying.dividend_model?.type === 'continuous') {
+                        underlying.dividend_model.continuous_yield = data.dividend_yield || 0;
+                    }
+                }
+            }
+
+            // Update correlations
+            if (marketData.correlations && Object.keys(marketData.correlations).length > 0) {
+                parsed.correlation = { pairwise: marketData.correlations };
+            }
+
+            setTermSheet(JSON.stringify(parsed, null, 2));
+        } catch (err: any) {
+            setError('Failed to fetch market data: ' + err.message);
+        } finally {
+            setFetchingData(false);
         }
     };
 
@@ -103,6 +157,9 @@ export default function PricingPage() {
                     </div>
                     <button className="btn btn-secondary" onClick={handleLoadExample}>
                         Load Example
+                    </button>
+                    <button className="btn btn-secondary" onClick={handleFetchLiveData} disabled={fetchingData}>
+                        {fetchingData ? '⏳ Fetching...' : '📊 Fetch Live Data'}
                     </button>
                     <button className="btn btn-primary" onClick={handleRunPricing} disabled={loading}>
                         {loading ? '⏳ Running...' : '▶ Run Pricing'}
