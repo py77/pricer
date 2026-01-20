@@ -16,7 +16,7 @@ export default function RootLayout({
             <body>
                 <header className="header">
                     <div className="container header-content">
-                        <div className="logo">📊 Pricer</div>
+                        <div className="logo">💾 Pricer</div>
                         <nav className="nav">
                             <a href="/" className="nav-link">Pricing</a>
                             <a href="/risk" className="nav-link">Risk</a>

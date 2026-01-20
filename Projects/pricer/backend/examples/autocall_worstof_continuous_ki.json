@@ -19,25 +19,14 @@
                 "continuous_yield": 0.005
             },
             "vol_model": {
-                "type": "piecewise_constant",
-                "term_structure": [
-                    {
-                        "date": "2024-07-15",
-                        "vol": 0.28
-                    },
-                    {
-                        "date": "2025-01-15",
-                        "vol": 0.26
-                    },
-                    {
-                        "date": "2026-01-15",
-                        "vol": 0.24
-                    },
-                    {
-                        "date": "2027-01-15",
-                        "vol": 0.23
-                    }
-                ]
+                "type": "local_stochastic",
+                "lsv_params": {
+                    "v0": 0.0784,
+                    "theta": 0.0576,
+                    "kappa": 2.0,
+                    "xi": 0.3,
+                    "rho": -0.7
+                }
             }
         },
         {
@@ -49,25 +38,14 @@
                 "continuous_yield": 0.0
             },
             "vol_model": {
-                "type": "piecewise_constant",
-                "term_structure": [
-                    {
-                        "date": "2024-07-15",
-                        "vol": 0.32
-                    },
-                    {
-                        "date": "2025-01-15",
-                        "vol": 0.30
-                    },
-                    {
-                        "date": "2026-01-15",
-                        "vol": 0.28
-                    },
-                    {
-                        "date": "2027-01-15",
-                        "vol": 0.27
-                    }
-                ]
+                "type": "local_stochastic",
+                "lsv_params": {
+                    "v0": 0.1024,
+                    "theta": 0.0784,
+                    "kappa": 1.8,
+                    "xi": 0.35,
+                    "rho": -0.65
+                }
             }
         },
         {
@@ -128,25 +106,14 @@
                 ]
             },
             "vol_model": {
-                "type": "piecewise_constant",
-                "term_structure": [
-                    {
-                        "date": "2024-07-15",
-                        "vol": 0.25
-                    },
-                    {
-                        "date": "2025-01-15",
-                        "vol": 0.24
-                    },
-                    {
-                        "date": "2026-01-15",
-                        "vol": 0.23
-                    },
-                    {
-                        "date": "2027-01-15",
-                        "vol": 0.22
-                    }
-                ]
+                "type": "local_stochastic",
+                "lsv_params": {
+                    "v0": 0.0625,
+                    "theta": 0.0529,
+                    "kappa": 2.2,
+                    "xi": 0.28,
+                    "rho": -0.75
+                }
             }
         }
     ],

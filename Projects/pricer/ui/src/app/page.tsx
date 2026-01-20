@@ -24,6 +24,34 @@ function formatPercent(n: number): string {
     return (n * 100).toFixed(2) + '%';
 }
 
+// Retro Window Component
+function RetroWindow({ 
+    title, 
+    color = 'cyan', 
+    children 
+}: { 
+    title: string; 
+    color?: 'cyan' | 'yellow' | 'pink' | 'green' | 'blue';
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="retro-window">
+            <div className={`retro-title-bar ${color}`}>
+                <div className="window-dots">
+                    <div className="window-dot red"></div>
+                    <div className="window-dot yellow"></div>
+                    <div className="window-dot green"></div>
+                </div>
+                <span className="window-title">{title}</span>
+                <div style={{ width: '44px' }}></div>
+            </div>
+            <div className="window-content">
+                {children}
+            </div>
+        </div>
+    );
+}
+
 export default function PricingPage() {
     const [termSheet, setTermSheet] = useState<string>('{}');
     const [config, setConfig] = useState<RunConfig>(DEFAULT_CONFIG);
@@ -163,7 +191,7 @@ export default function PricingPage() {
             </div>
 
             {/* Controls */}
-            <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <RetroWindow title="Controls" color="yellow">
                 <div className="controls-row">
                     <div className="control-group">
                         <label className="control-label">Paths</label>
@@ -196,38 +224,38 @@ export default function PricingPage() {
                         Load Example
                     </button>
                     <button className="btn btn-secondary" onClick={handleFetchLiveData} disabled={fetchingData}>
-                        {fetchingData ? '⏳ Fetching...' : '📊 Fetch Live Data'}
+                        {fetchingData ? 'Fetching...' : 'Fetch Live Data'}
                     </button>
                     <button className="btn btn-primary" onClick={handleRunPricing} disabled={loading}>
-                        {loading ? '⏳ Running...' : '▶ Run Pricing'}
+                        {loading ? 'Running...' : 'Run Pricing'}
                     </button>
                 </div>
-            </div>
+            </RetroWindow>
 
-            {error && <div className="error-box" style={{ marginBottom: '1.5rem' }}>{error}</div>}
+            {error && <div className="error-box" style={{ marginBottom: '1rem' }}>{error}</div>}
 
             <div className="editor-layout">
                 {/* Editor Panel */}
                 <div className="editor-panel">
-                    <div className="editor-header">
-                        <span className="editor-title">Term Sheet (JSON)</span>
-                    </div>
-                    <div className="editor-container">
-                        <MonacoEditor
-                            height="100%"
-                            language="json"
-                            theme="vs-dark"
-                            value={termSheet}
-                            onChange={(value) => setTermSheet(value || '{}')}
-                            options={{
-                                minimap: { enabled: false },
-                                fontSize: 13,
-                                lineNumbers: 'on',
-                                scrollBeyondLastLine: false,
-                                wordWrap: 'on',
-                            }}
-                        />
-                    </div>
+                    <RetroWindow title="Term Sheet (JSON)" color="cyan">
+                        <div className="editor-container" style={{ margin: '-12px', marginTop: '-12px' }}>
+                            <MonacoEditor
+                                height="400px"
+                                language="json"
+                                theme="vs"
+                                value={termSheet}
+                                onChange={(value) => setTermSheet(value || '{}')}
+                                options={{
+                                    minimap: { enabled: false },
+                                    fontSize: 13,
+                                    lineNumbers: 'on',
+                                    scrollBeyondLastLine: false,
+                                    wordWrap: 'on',
+                                    fontFamily: 'Consolas, monospace',
+                                }}
+                            />
+                        </div>
+                    </RetroWindow>
                 </div>
 
                 {/* Results Panel */}
@@ -235,61 +263,61 @@ export default function PricingPage() {
                     {result ? (
                         <>
                             {/* Summary Cards */}
-                            <div className="card-grid">
-                                <div className="card">
-                                    <div className="stat-value">${formatNumber(result.summary.pv, 0)}</div>
-                                    <div className="stat-label">Present Value</div>
+                            <RetroWindow title="Summary" color="green">
+                                <div className="card-grid">
+                                    <div className="card">
+                                        <div className="stat-value">${formatNumber(result.summary.pv, 0)}</div>
+                                        <div className="stat-label">Present Value</div>
+                                    </div>
+                                    <div className="card">
+                                        <div className="stat-value">{formatPercent(result.summary.pv_pct_notional)}</div>
+                                        <div className="stat-label">PV % of Notional</div>
+                                    </div>
+                                    <div className="card">
+                                        <div className="stat-value">{formatPercent(result.summary.autocall_probability)}</div>
+                                        <div className="stat-label">Autocall Prob</div>
+                                    </div>
+                                    <div className="card">
+                                        <div className="stat-value">{formatPercent(result.summary.ki_probability)}</div>
+                                        <div className="stat-label">KI Probability</div>
+                                    </div>
+                                    <div className="card">
+                                        <div className="stat-value">{result.summary.expected_coupon_count.toFixed(2)}</div>
+                                        <div className="stat-label">Expected Coupons</div>
+                                    </div>
+                                    <div className="card">
+                                        <div className="stat-value">{result.summary.expected_life_years.toFixed(2)}y</div>
+                                        <div className="stat-label">Expected Life</div>
+                                    </div>
                                 </div>
-                                <div className="card">
-                                    <div className="stat-value">{formatPercent(result.summary.pv_pct_notional)}</div>
-                                    <div className="stat-label">PV % of Notional</div>
-                                </div>
-                                <div className="card">
-                                    <div className="stat-value">{formatPercent(result.summary.autocall_probability)}</div>
-                                    <div className="stat-label">Autocall Prob</div>
-                                </div>
-                                <div className="card">
-                                    <div className="stat-value">{formatPercent(result.summary.ki_probability)}</div>
-                                    <div className="stat-label">KI Probability</div>
-                                </div>
-                                <div className="card">
-                                    <div className="stat-value">{result.summary.expected_coupon_count.toFixed(2)}</div>
-                                    <div className="stat-label">Expected Coupons</div>
-                                </div>
-                                <div className="card">
-                                    <div className="stat-value">{result.summary.expected_life_years.toFixed(2)}y</div>
-                                    <div className="stat-label">Expected Life</div>
-                                </div>
-                            </div>
+                            </RetroWindow>
 
                             {/* Decomposition */}
-                            <div className="card">
-                                <h3 style={{ marginBottom: '1rem' }}>PV Decomposition</h3>
+                            <RetroWindow title="PV Decomposition" color="pink">
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                                     <div>
-                                        <div style={{ color: 'var(--success)', fontSize: '1.25rem', fontWeight: 600 }}>
+                                        <div style={{ color: 'var(--success)', fontSize: '1.25rem', fontWeight: 700 }}>
                                             ${formatNumber(result.decomposition.coupon_pv, 0)}
                                         </div>
                                         <div className="stat-label">Coupon PV</div>
                                     </div>
                                     <div>
-                                        <div style={{ color: 'var(--primary)', fontSize: '1.25rem', fontWeight: 600 }}>
+                                        <div style={{ color: 'var(--primary)', fontSize: '1.25rem', fontWeight: 700 }}>
                                             ${formatNumber(result.decomposition.autocall_redemption_pv, 0)}
                                         </div>
                                         <div className="stat-label">Autocall Redemption</div>
                                     </div>
                                     <div>
-                                        <div style={{ color: 'var(--warning)', fontSize: '1.25rem', fontWeight: 600 }}>
+                                        <div style={{ color: 'var(--warning)', fontSize: '1.25rem', fontWeight: 700 }}>
                                             ${formatNumber(result.decomposition.maturity_redemption_pv, 0)}
                                         </div>
                                         <div className="stat-label">Maturity Redemption</div>
                                     </div>
                                 </div>
-                            </div>
+                            </RetroWindow>
 
                             {/* Cashflows Table */}
-                            <div className="card">
-                                <h3 style={{ marginBottom: '1rem' }}>Expected Cashflows</h3>
+                            <RetroWindow title="Expected Cashflows" color="blue">
                                 <div className="table-container">
                                     <table>
                                         <thead>
@@ -314,24 +342,26 @@ export default function PricingPage() {
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
+                            </RetroWindow>
 
                             {/* Stats */}
-                            <div className="card">
-                                <div style={{ display: 'flex', gap: '2rem', fontSize: '0.875rem', color: 'var(--muted)' }}>
+                            <RetroWindow title="Statistics" color="cyan">
+                                <div style={{ display: 'flex', gap: '2rem', fontSize: '13px' }}>
                                     <span>Paths: {result.summary.num_paths.toLocaleString()}</span>
                                     <span>Std Error: ${formatNumber(result.summary.pv_std_error)}</span>
                                     <span>Time: {result.summary.computation_time_ms.toFixed(0)}ms</span>
                                 </div>
-                            </div>
+                            </RetroWindow>
                         </>
                     ) : (
-                        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-                            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📈</div>
-                            <div style={{ color: 'var(--muted)' }}>
-                                Click "Run Pricing" to calculate PV and statistics
+                        <RetroWindow title="Results" color="green">
+                            <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
+                                <div style={{ color: 'var(--muted)' }}>
+                                    Click "Run Pricing" to calculate PV and statistics
+                                </div>
                             </div>
-                        </div>
+                        </RetroWindow>
                     )}
                 </div>
             </div>
