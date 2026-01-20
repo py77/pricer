@@ -17,6 +17,24 @@ from pricer.engines.path_generator import (
     compute_cholesky,
     brownian_bridge_hit_probability,
 )
+from pricer.engines.black_scholes import (
+    bs_call_price,
+    bs_put_price,
+    bs_greeks,
+    price_vanilla,
+    implied_vol,
+    Greeks,
+    VanillaResult,
+)
+from pricer.engines.tree_pricer import (
+    BinomialTree,
+    TrinomialTree,
+    price_american,
+    price_european_tree,
+    TreeResult,
+    ExerciseStyle,
+    OptionType,
+)
 
 __all__ = [
     "PricingEngine",
@@ -34,4 +52,21 @@ __all__ = [
     "validate_and_fix_correlation",
     "compute_cholesky",
     "brownian_bridge_hit_probability",
+    # Black-Scholes
+    "bs_call_price",
+    "bs_put_price",
+    "bs_greeks",
+    "price_vanilla",
+    "implied_vol",
+    "Greeks",
+    "VanillaResult",
+    # Tree pricing
+    "BinomialTree",
+    "TrinomialTree",
+    "price_american",
+    "price_european_tree",
+    "TreeResult",
+    "ExerciseStyle",
+    "OptionType",
 ]
+

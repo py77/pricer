@@ -29,6 +29,26 @@ try:
 except ImportError:
     HAS_MARKET_DATA = False
 
+# Vanilla pricing engines
+from pricer.engines.black_scholes import (
+    bs_call_price,
+    bs_put_price,
+    bs_greeks,
+    price_vanilla,
+    implied_vol,
+    Greeks,
+    VanillaResult,
+)
+from pricer.engines.tree_pricer import (
+    BinomialTree,
+    TrinomialTree,
+    price_american,
+    price_european_tree,
+    TreeResult,
+    ExerciseStyle,
+    OptionType,
+)
+
 
 app = FastAPI(
     title="Structured Products Pricer API",
@@ -442,6 +462,157 @@ async def get_market_data(tickers: str, maturity_years: int = 3):
         )
 
 
+# ==============================================================================
+# Vanilla Pricing Endpoints
+# ==============================================================================
+
+class VanillaPriceRequest(BaseModel):
+    """Request for vanilla option pricing."""
+    spot: float = Field(..., gt=0, description="Spot price")
+    strike: float = Field(..., gt=0, description="Strike price")
+    time_to_expiry: float = Field(..., gt=0, le=30, description="Time to expiry in years")
+    rate: float = Field(default=0.05, description="Risk-free rate")
+    dividend_yield: float = Field(default=0.0, ge=0, description="Continuous dividend yield")
+    volatility: float = Field(..., gt=0, le=5.0, description="Volatility")
+    is_call: bool = Field(default=True, description="True for call, False for put")
+    exercise: str = Field(default="european", pattern="^(european|american)$")
+    method: str = Field(default="black_scholes", pattern="^(black_scholes|binomial|trinomial)$")
+    tree_steps: int = Field(default=200, ge=10, le=1000, description="Steps for tree pricing")
+
+
+class VanillaPriceResponse(BaseModel):
+    """Response from vanilla pricing."""
+    price: float
+    method: str
+    delta: float
+    gamma: float
+    theta: float
+    vega: Optional[float] = None
+    rho: Optional[float] = None
+
+
+class ImpliedVolRequest(BaseModel):
+    """Request for implied volatility calculation."""
+    price: float = Field(..., gt=0, description="Option market price")
+    spot: float = Field(..., gt=0, description="Spot price")
+    strike: float = Field(..., gt=0, description="Strike price")
+    time_to_expiry: float = Field(..., gt=0, le=30, description="Time to expiry in years")
+    rate: float = Field(default=0.05, description="Risk-free rate")
+    dividend_yield: float = Field(default=0.0, ge=0, description="Continuous dividend yield")
+    is_call: bool = Field(default=True, description="True for call, False for put")
+
+
+class ImpliedVolResponse(BaseModel):
+    """Response from implied volatility calculation."""
+    implied_vol: Optional[float]
+    converged: bool
+
+
+@app.post("/vanilla/price", response_model=VanillaPriceResponse)
+async def price_vanilla_option(request: VanillaPriceRequest):
+    """
+    Price a vanilla European or American option.
+    
+    Methods:
+    - black_scholes: Closed-form Black-Scholes (European only)
+    - binomial: CRR binomial tree
+    - trinomial: Trinomial tree
+    """
+    try:
+        S = request.spot
+        K = request.strike
+        T = request.time_to_expiry
+        r = request.rate
+        q = request.dividend_yield
+        sigma = request.volatility
+        is_call = request.is_call
+        
+        if request.method == "black_scholes":
+            if request.exercise == "american":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Black-Scholes only supports European exercise. Use binomial or trinomial for American."
+                )
+            
+            result = price_vanilla(S, K, T, r, q, sigma, is_call)
+            return VanillaPriceResponse(
+                price=result.price,
+                method="black_scholes",
+                delta=result.greeks.delta,
+                gamma=result.greeks.gamma,
+                theta=result.greeks.theta,
+                vega=result.greeks.vega,
+                rho=result.greeks.rho,
+            )
+        
+        elif request.method == "binomial":
+            tree = BinomialTree(S, K, T, r, q, sigma, request.tree_steps)
+            exercise_style = ExerciseStyle.AMERICAN if request.exercise == "american" else ExerciseStyle.EUROPEAN
+            option_type = OptionType.CALL if is_call else OptionType.PUT
+            result = tree.price(option_type, exercise_style)
+            
+            return VanillaPriceResponse(
+                price=result.price,
+                method="binomial",
+                delta=result.delta,
+                gamma=result.gamma,
+                theta=result.theta,
+            )
+        
+        else:  # trinomial
+            tree = TrinomialTree(S, K, T, r, q, sigma, request.tree_steps)
+            exercise_style = ExerciseStyle.AMERICAN if request.exercise == "american" else ExerciseStyle.EUROPEAN
+            option_type = OptionType.CALL if is_call else OptionType.PUT
+            result = tree.price(option_type, exercise_style)
+            
+            return VanillaPriceResponse(
+                price=result.price,
+                method="trinomial",
+                delta=result.delta,
+                gamma=result.gamma,
+                theta=result.theta,
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Pricing error: {str(e)}\n{traceback.format_exc()}"
+        )
+
+
+@app.post("/vanilla/implied-vol", response_model=ImpliedVolResponse)
+async def calculate_implied_vol(request: ImpliedVolRequest):
+    """
+    Calculate implied volatility from option price.
+    
+    Uses Newton-Raphson with bisection fallback.
+    """
+    try:
+        iv = implied_vol(
+            price=request.price,
+            S=request.spot,
+            K=request.strike,
+            T=request.time_to_expiry,
+            r=request.rate,
+            q=request.dividend_yield,
+            is_call=request.is_call,
+        )
+        
+        return ImpliedVolResponse(
+            implied_vol=iv,
+            converged=iv is not None,
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Implied vol error: {str(e)}\n{traceback.format_exc()}"
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
