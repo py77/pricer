@@ -256,42 +256,98 @@ def generate_cashflow_report(
     maturity_prob = 1.0 - eval_result.autocall_probability
     
     if maturity_prob > 0:
-        # Approximate expected maturity redemption
-        # This is simplified - actual would depend on KI state and final performance
-        ki_prob = eval_result.ki_probability
-        no_ki_prob = maturity_prob * (1.0 - ki_prob)
-        ki_at_maturity_prob = maturity_prob * ki_prob
+        # Compute actual expected redemption from MC paths
+        # We need to get the actual per-path outcomes
+        spots_0 = np.array([u.spot for u in term_sheet.underlyings])
+        maturity_step = grid.maturity_index
         
-        # No KI: full redemption
-        if no_ki_prob > 0:
-            no_ki_redemption = term_sheet.payoff.redemption_if_no_ki * notional
-            expected_no_ki = no_ki_redemption * no_ki_prob
+        if maturity_step >= 0:
+            # Rebuild alive state at maturity by retracing autocalls
+            alive = np.ones(num_paths, dtype=bool)
+            obs_dates = term_sheet.schedules.observation_dates
+            autocall_levels = np.array(term_sheet.schedules.autocall_levels)
+            worst_of = term_sheet.payoff.worst_of
             
-            cashflows.append(CashflowEntry(
-                date=term_sheet.meta.maturity_date,
-                payment_date=maturity_pmt_date,
-                type="maturity_no_ki",
-                expected_amount=expected_no_ki,
-                discount_factor=df_maturity,
-                pv_contribution=expected_no_ki * df_maturity,
-                probability=no_ki_prob,
-            ))
-        
-        # With KI: worst performance redemption (estimated)
-        if ki_at_maturity_prob > 0:
-            # Rough estimate: average redemption with KI ~ 0.7 * notional
-            avg_ki_redemption = 0.7 * notional  # This is a simplification
-            expected_ki = avg_ki_redemption * ki_at_maturity_prob
+            for obs_idx, obs_date in enumerate(obs_dates):
+                if obs_date not in grid.observation_indices:
+                    continue
+                step = grid.observation_indices[obs_date]
+                current_spots = paths.spots[:, step, :]
+                perf = current_spots / spots_0
+                if worst_of:
+                    wof = np.min(perf, axis=1)
+                else:
+                    wof = np.max(perf, axis=1)
+                ac_level = autocall_levels[obs_idx]
+                alive[alive & (wof >= ac_level)] = False
             
-            cashflows.append(CashflowEntry(
-                date=term_sheet.meta.maturity_date,
-                payment_date=maturity_pmt_date,
-                type="maturity_with_ki",
-                expected_amount=expected_ki,
-                discount_factor=df_maturity,
-                pv_contribution=expected_ki * df_maturity,
-                probability=ki_at_maturity_prob,
-            ))
+            # For paths alive at maturity, compute redemption
+            alive_paths = np.where(alive)[0]
+            if len(alive_paths) > 0:
+                final_spots = paths.spots[alive_paths, maturity_step, :]
+                final_perf = final_spots / spots_0
+                if worst_of:
+                    wof_final = np.min(final_perf, axis=1)
+                else:
+                    wof_final = np.max(final_perf, axis=1)
+                
+                knocked_in_at_maturity = paths.ki_state[alive_paths]
+                
+                # Compute redemption per path at maturity
+                redemption_per_path = np.zeros(len(alive_paths))
+                
+                # No KI paths
+                no_ki_mask = ~knocked_in_at_maturity
+                if np.any(no_ki_mask):
+                    redemption_per_path[no_ki_mask] = term_sheet.payoff.redemption_if_no_ki * notional
+                
+                # KI paths
+                ki_mask = knocked_in_at_maturity
+                if np.any(ki_mask):
+                    if term_sheet.payoff.redemption_if_ki == "worst_performance":
+                        redemption_per_path[ki_mask] = wof_final[ki_mask] * notional
+                    elif term_sheet.payoff.redemption_if_ki == "fixed":
+                        floor = term_sheet.payoff.ki_redemption_floor or 0.0
+                        redemption_per_path[ki_mask] = floor * notional
+                    else:  # floored
+                        floor = term_sheet.payoff.ki_redemption_floor or 0.0
+                        redemption_per_path[ki_mask] = np.maximum(wof_final[ki_mask], floor) * notional
+                
+                # Probabilities (fraction of total paths)
+                no_ki_count = np.sum(no_ki_mask)
+                ki_count = np.sum(ki_mask)
+                
+                # No KI maturity cashflow
+                if no_ki_count > 0:
+                    no_ki_prob = no_ki_count / num_paths
+                    no_ki_expected = np.mean(redemption_per_path[no_ki_mask]) * (no_ki_count / num_paths) * num_paths / no_ki_count
+                    # Simpler: total expected = mean over all paths
+                    no_ki_expected_total = np.sum(redemption_per_path[no_ki_mask]) / num_paths
+                    
+                    cashflows.append(CashflowEntry(
+                        date=term_sheet.meta.maturity_date,
+                        payment_date=maturity_pmt_date,
+                        type="maturity_no_ki",
+                        expected_amount=no_ki_expected_total,
+                        discount_factor=df_maturity,
+                        pv_contribution=no_ki_expected_total * df_maturity,
+                        probability=no_ki_prob,
+                    ))
+                
+                # KI maturity cashflow
+                if ki_count > 0:
+                    ki_prob = ki_count / num_paths
+                    ki_expected_total = np.sum(redemption_per_path[ki_mask]) / num_paths
+                    
+                    cashflows.append(CashflowEntry(
+                        date=term_sheet.meta.maturity_date,
+                        payment_date=maturity_pmt_date,
+                        type="maturity_with_ki",
+                        expected_amount=ki_expected_total,
+                        discount_factor=df_maturity,
+                        pv_contribution=ki_expected_total * df_maturity,
+                        probability=ki_prob,
+                    ))
     
     # Build summary
     summary = PricingSummary(
