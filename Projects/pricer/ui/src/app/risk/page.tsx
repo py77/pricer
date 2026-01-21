@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { analyzeRisk, getExampleSchema, RiskResponse, RunConfig, BumpConfig } from '@/api/client';
 
@@ -29,6 +29,34 @@ function formatPercent(n: number): string {
     return (n * 100).toFixed(2) + '%';
 }
 
+// Retro Window Component
+function RetroWindow({
+    title,
+    color = 'cyan',
+    children
+}: {
+    title: string;
+    color?: 'cyan' | 'yellow' | 'pink' | 'green' | 'blue';
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="retro-window">
+            <div className={`retro-title-bar ${color}`}>
+                <div className="window-dots">
+                    <div className="window-dot red"></div>
+                    <div className="window-dot yellow"></div>
+                    <div className="window-dot green"></div>
+                </div>
+                <span className="window-title">{title}</span>
+                <div style={{ width: '44px' }}></div>
+            </div>
+            <div className="window-content">
+                {children}
+            </div>
+        </div>
+    );
+}
+
 export default function RiskPage() {
     const [termSheet, setTermSheet] = useState<string>('{}');
     const [runConfig, setRunConfig] = useState<RunConfig>(DEFAULT_RUN_CONFIG);
@@ -36,6 +64,14 @@ export default function RiskPage() {
     const [result, setResult] = useState<RiskResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+
+    const parsedTermSheet = useMemo(() => {
+        try {
+            return JSON.parse(termSheet);
+        } catch (err) {
+            return null;
+        }
+    }, [termSheet]);
 
     useEffect(() => {
         getExampleSchema()
@@ -77,7 +113,7 @@ export default function RiskPage() {
             </div>
 
             {/* Controls */}
-            <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <RetroWindow title="Controls" color="yellow">
                 <div className="controls-row">
                     <div className="control-group">
                         <label className="control-label">Paths</label>
@@ -95,6 +131,15 @@ export default function RiskPage() {
                             className="control-input"
                             value={runConfig.seed}
                             onChange={e => setRunConfig({ ...runConfig, seed: parseInt(e.target.value) || 42 })}
+                        />
+                    </div>
+                    <div className="control-group">
+                        <label className="control-label">Block Size</label>
+                        <input
+                            type="number"
+                            className="control-input"
+                            value={runConfig.block_size}
+                            onChange={e => setRunConfig({ ...runConfig, block_size: parseInt(e.target.value) || 50000 })}
                         />
                     </div>
                     <div className="control-group">
@@ -130,35 +175,40 @@ export default function RiskPage() {
                         Load Example
                     </button>
                     <button className="btn btn-primary" onClick={handleRunRisk} disabled={loading}>
-                        {loading ? '⏳ Running...' : '▶ Run Risk'}
+                        {loading ? 'Running...' : 'Run Risk'}
                     </button>
                 </div>
-            </div>
+            </RetroWindow>
 
             {error && <div className="error-box" style={{ marginBottom: '1.5rem' }}>{error}</div>}
 
             <div className="editor-layout">
                 {/* Editor Panel */}
                 <div className="editor-panel">
-                    <div className="editor-header">
-                        <span className="editor-title">Term Sheet (JSON)</span>
-                    </div>
-                    <div className="editor-container">
-                        <MonacoEditor
-                            height="100%"
-                            language="json"
-                            theme="vs-dark"
-                            value={termSheet}
-                            onChange={(value) => setTermSheet(value || '{}')}
-                            options={{
-                                minimap: { enabled: false },
-                                fontSize: 13,
-                                lineNumbers: 'on',
-                                scrollBeyondLastLine: false,
-                                wordWrap: 'on',
-                            }}
-                        />
-                    </div>
+                    <RetroWindow title="Term Sheet (JSON)" color="cyan">
+                        {!parsedTermSheet && (
+                            <div className="error-box" style={{ marginBottom: '1rem' }}>
+                                Invalid JSON detected. Fix the JSON to run risk analysis.
+                            </div>
+                        )}
+                        <div className="editor-container">
+                            <MonacoEditor
+                                height="100%"
+                                language="json"
+                                theme="vs"
+                                value={termSheet}
+                                onChange={(value) => setTermSheet(value || '{}')}
+                                options={{
+                                    minimap: { enabled: false },
+                                    fontSize: 13,
+                                    lineNumbers: 'on',
+                                    scrollBeyondLastLine: false,
+                                    wordWrap: 'on',
+                                    fontFamily: 'Consolas, monospace',
+                                }}
+                            />
+                        </div>
+                    </RetroWindow>
                 </div>
 
                 {/* Results Panel */}
@@ -166,28 +216,29 @@ export default function RiskPage() {
                     {result ? (
                         <>
                             {/* Summary Cards */}
-                            <div className="card-grid">
-                                <div className="card">
-                                    <div className="stat-value">${formatNumber(result.summary.pv, 0)}</div>
-                                    <div className="stat-label">Present Value</div>
+                            <RetroWindow title="Summary" color="green">
+                                <div className="card-grid">
+                                    <div className="card">
+                                        <div className="stat-value">${formatNumber(result.summary.pv, 0)}</div>
+                                        <div className="stat-label">Present Value</div>
+                                    </div>
+                                    <div className="card">
+                                        <div className="stat-value">{formatPercent(result.summary.autocall_probability)}</div>
+                                        <div className="stat-label">Autocall Prob</div>
+                                    </div>
+                                    <div className="card">
+                                        <div className="stat-value">{formatPercent(result.summary.ki_probability)}</div>
+                                        <div className="stat-label">KI Probability</div>
+                                    </div>
+                                    <div className="card">
+                                        <div className="stat-value">{result.summary.expected_life_years.toFixed(2)}y</div>
+                                        <div className="stat-label">Expected Life</div>
+                                    </div>
                                 </div>
-                                <div className="card">
-                                    <div className="stat-value">{formatPercent(result.summary.autocall_probability)}</div>
-                                    <div className="stat-label">Autocall Prob</div>
-                                </div>
-                                <div className="card">
-                                    <div className="stat-value">{formatPercent(result.summary.ki_probability)}</div>
-                                    <div className="stat-label">KI Probability</div>
-                                </div>
-                                <div className="card">
-                                    <div className="stat-value">{result.summary.expected_life_years.toFixed(2)}y</div>
-                                    <div className="stat-label">Expected Life</div>
-                                </div>
-                            </div>
+                            </RetroWindow>
 
                             {/* Greeks Table */}
-                            <div className="card">
-                                <h3 style={{ marginBottom: '1rem' }}>Greeks (CRN Central Diff)</h3>
+                            <RetroWindow title="Greeks (CRN Central Diff)" color="blue">
                                 <div className="table-container">
                                     <table>
                                         <thead>
@@ -216,36 +267,34 @@ export default function RiskPage() {
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
+                            </RetroWindow>
 
                             {/* Decomposition */}
-                            <div className="card">
-                                <h3 style={{ marginBottom: '1rem' }}>PV Decomposition</h3>
+                            <RetroWindow title="PV Decomposition" color="pink">
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                                     <div>
-                                        <div style={{ color: 'var(--success)', fontSize: '1.25rem', fontWeight: 600 }}>
+                                        <div style={{ color: 'var(--success)', fontSize: '1.25rem', fontWeight: 700 }}>
                                             ${formatNumber(result.decomposition.coupon_pv, 0)}
                                         </div>
                                         <div className="stat-label">Coupon PV</div>
                                     </div>
                                     <div>
-                                        <div style={{ color: 'var(--primary)', fontSize: '1.25rem', fontWeight: 600 }}>
+                                        <div style={{ color: 'var(--primary)', fontSize: '1.25rem', fontWeight: 700 }}>
                                             ${formatNumber(result.decomposition.autocall_redemption_pv, 0)}
                                         </div>
                                         <div className="stat-label">Autocall Redemption</div>
                                     </div>
                                     <div>
-                                        <div style={{ color: 'var(--warning)', fontSize: '1.25rem', fontWeight: 600 }}>
+                                        <div style={{ color: 'var(--warning)', fontSize: '1.25rem', fontWeight: 700 }}>
                                             ${formatNumber(result.decomposition.maturity_redemption_pv, 0)}
                                         </div>
                                         <div className="stat-label">Maturity Redemption</div>
                                     </div>
                                 </div>
-                            </div>
+                            </RetroWindow>
 
                             {/* Cashflows Table */}
-                            <div className="card">
-                                <h3 style={{ marginBottom: '1rem' }}>Expected Cashflows</h3>
+                            <RetroWindow title="Expected Cashflows" color="blue">
                                 <div className="table-container">
                                     <table>
                                         <thead>
@@ -253,6 +302,7 @@ export default function RiskPage() {
                                                 <th>Date</th>
                                                 <th>Type</th>
                                                 <th style={{ textAlign: 'right' }}>Probability</th>
+                                                <th style={{ textAlign: 'right' }}>Expected Amt</th>
                                                 <th style={{ textAlign: 'right' }}>PV Contrib</th>
                                             </tr>
                                         </thead>
@@ -262,21 +312,32 @@ export default function RiskPage() {
                                                     <td>{cf.date}</td>
                                                     <td>{cf.type}</td>
                                                     <td style={{ textAlign: 'right' }}>{formatPercent(cf.probability)}</td>
+                                                    <td style={{ textAlign: 'right' }}>${formatNumber(cf.expected_amount, 0)}</td>
                                                     <td style={{ textAlign: 'right' }}>${formatNumber(cf.pv_contribution, 0)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
-                            </div>
+                            </RetroWindow>
+
+                            <RetroWindow title="Statistics" color="cyan">
+                                <div style={{ display: 'flex', gap: '2rem', fontSize: '13px' }}>
+                                    <span>Paths: {result.summary.num_paths.toLocaleString()}</span>
+                                    <span>Std Error: ${formatNumber(result.summary.pv_std_error)}</span>
+                                    <span>Time: {result.summary.computation_time_ms.toFixed(0)}ms</span>
+                                </div>
+                            </RetroWindow>
                         </>
                     ) : (
-                        <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-                            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
-                            <div style={{ color: 'var(--muted)' }}>
-                                Click "Run Risk" to calculate Greeks and sensitivity analysis
+                        <RetroWindow title="Results" color="green">
+                            <div style={{ textAlign: 'center', padding: '2rem' }}>
+                                <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
+                                <div style={{ color: 'var(--muted)' }}>
+                                    Click "Run Risk" to calculate Greeks and sensitivity analysis
+                                </div>
                             </div>
-                        </div>
+                        </RetroWindow>
                     )}
                 </div>
             </div>
