@@ -40,6 +40,105 @@ type InstrumentCard = {
     };
 };
 
+type ProtectionInputId =
+    | 'ki_level'
+    | 'ki_monitoring'
+    | 'worst_of'
+    | 'coupon_memory'
+    | 'settlement'
+    | 'autocall_redemption'
+    | 'no_ki_redemption'
+    | 'ki_redemption'
+    | 'ki_redemption_floor';
+
+const PROTECTION_INPUTS: Record<ProtectionInputId, { label: string; description: string }> = {
+    ki_level: {
+        label: 'KI Barrier',
+        description: 'Downside trigger level as % of initial',
+    },
+    ki_monitoring: {
+        label: 'KI Monitoring',
+        description: 'Barrier observation style',
+    },
+    worst_of: {
+        label: 'Worst Of',
+        description: 'Apply worst-of basket payoff',
+    },
+    coupon_memory: {
+        label: 'Coupon Memory',
+        description: 'Accrue missed coupons',
+    },
+    settlement: {
+        label: 'Settlement',
+        description: 'Cash or physical delivery',
+    },
+    autocall_redemption: {
+        label: 'Autocall Redemption',
+        description: 'Redemption amount upon autocall',
+    },
+    no_ki_redemption: {
+        label: 'No KI Redemption',
+        description: 'Maturity redemption if no KI',
+    },
+    ki_redemption: {
+        label: 'KI Redemption',
+        description: 'Maturity rule after KI',
+    },
+    ki_redemption_floor: {
+        label: 'KI Redemption Floor',
+        description: 'Floor applied after KI',
+    },
+};
+
+const PROTECTION_INPUTS_BY_INSTRUMENT: Record<string, ProtectionInputId[]> = {
+    autocallable: [
+        'ki_level',
+        'ki_monitoring',
+        'worst_of',
+        'coupon_memory',
+        'settlement',
+        'autocall_redemption',
+        'no_ki_redemption',
+        'ki_redemption',
+        'ki_redemption_floor',
+    ],
+    phoenix: [
+        'ki_level',
+        'ki_monitoring',
+        'worst_of',
+        'coupon_memory',
+        'settlement',
+        'autocall_redemption',
+        'no_ki_redemption',
+        'ki_redemption',
+        'ki_redemption_floor',
+    ],
+    'reverse-convertible': [
+        'ki_level',
+        'ki_monitoring',
+        'worst_of',
+        'settlement',
+        'no_ki_redemption',
+        'ki_redemption',
+        'ki_redemption_floor',
+    ],
+    'vanilla-options': ['settlement'],
+    fx: ['settlement', 'no_ki_redemption'],
+    rates: ['settlement', 'autocall_redemption', 'no_ki_redemption'],
+    credit: ['settlement', 'no_ki_redemption'],
+    hybrid: [
+        'ki_level',
+        'ki_monitoring',
+        'worst_of',
+        'coupon_memory',
+        'settlement',
+        'autocall_redemption',
+        'no_ki_redemption',
+        'ki_redemption',
+        'ki_redemption_floor',
+    ],
+};
+
 const CATEGORY_PILLS = [
     'All',
     'Autocallable',
@@ -395,6 +494,10 @@ export default function PricingPage() {
         });
     };
 
+    const selectedInstrument = INSTRUMENTS.find((instrument) => instrument.id === selectedInstrumentId);
+    const protectionInputs = PROTECTION_INPUTS_BY_INSTRUMENT[selectedInstrumentId]
+        ?? PROTECTION_INPUTS_BY_INSTRUMENT.autocallable;
+
     return (
         <div>
             <div className="page-header">
@@ -479,7 +582,7 @@ export default function PricingPage() {
             <div ref={pricerRef} />
 
             <Frame
-                title={`Pricer workspace · ${INSTRUMENTS.find((instrument) => instrument.id === selectedInstrumentId)?.title ?? 'Instrument'}`}
+                title={`Pricer workspace · ${selectedInstrument?.title ?? 'Instrument'}`}
                 subtitle="Configure inputs and run pricing"
             >
                 <div className="controls-row">
@@ -782,112 +885,147 @@ export default function PricingPage() {
 
                         <div className="term-sheet-section">
                             <div className="term-sheet-section-title">Protection & Redemption</div>
+                            <div className="term-sheet-requirements">
+                                <div className="term-sheet-requirements-title">
+                                    Required inputs for {selectedInstrument?.title ?? 'Instrument'}
+                                </div>
+                                <ul className="term-sheet-requirements-list">
+                                    {protectionInputs.map((inputId) => (
+                                        <li key={inputId}>
+                                            <span className="term-sheet-requirements-label">
+                                                {PROTECTION_INPUTS[inputId].label}
+                                            </span>
+                                            <span className="term-sheet-requirements-note">
+                                                {PROTECTION_INPUTS[inputId].description}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
                             <div className="term-sheet-grid">
-                                <div className="form-group">
-                                    <label className="form-label">KI Barrier</label>
-                                    <input
-                                        className="form-input"
-                                        type="number"
-                                        step="0.01"
-                                        value={parsedTermSheet?.ki_barrier?.level ?? 0}
-                                        onChange={(e) => handleKiChange('level', parseNumber(e.target.value, 0))}
-                                        disabled={!parsedTermSheet}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">KI Monitoring</label>
-                                    <select
-                                        className="form-input"
-                                        value={parsedTermSheet?.ki_barrier?.monitoring ?? 'continuous'}
-                                        onChange={(e) => handleKiChange('monitoring', e.target.value)}
-                                        disabled={!parsedTermSheet}
-                                    >
-                                        <option value="continuous">Continuous</option>
-                                        <option value="discrete">Discrete</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Worst Of</label>
-                                    <select
-                                        className="form-input"
-                                        value={(parsedTermSheet?.payoff?.worst_of ?? false).toString()}
-                                        onChange={(e) => handlePayoffChange('worst_of', e.target.value === 'true')}
-                                        disabled={!parsedTermSheet}
-                                    >
-                                        <option value="true">Yes</option>
-                                        <option value="false">No</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Coupon Memory</label>
-                                    <select
-                                        className="form-input"
-                                        value={(parsedTermSheet?.payoff?.coupon_memory ?? false).toString()}
-                                        onChange={(e) => handlePayoffChange('coupon_memory', e.target.value === 'true')}
-                                        disabled={!parsedTermSheet}
-                                    >
-                                        <option value="true">Yes</option>
-                                        <option value="false">No</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Settlement</label>
-                                    <select
-                                        className="form-input"
-                                        value={parsedTermSheet?.payoff?.settlement ?? 'cash'}
-                                        onChange={(e) => handlePayoffChange('settlement', e.target.value)}
-                                        disabled={!parsedTermSheet}
-                                    >
-                                        <option value="cash">Cash</option>
-                                        <option value="physical">Physical</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Autocall Redemption</label>
-                                    <input
-                                        className="form-input"
-                                        type="number"
-                                        step="0.01"
-                                        value={parsedTermSheet?.payoff?.redemption_if_autocall ?? 0}
-                                        onChange={(e) => handlePayoffChange('redemption_if_autocall', parseNumber(e.target.value, 0))}
-                                        disabled={!parsedTermSheet}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">No KI Redemption</label>
-                                    <input
-                                        className="form-input"
-                                        type="number"
-                                        step="0.01"
-                                        value={parsedTermSheet?.payoff?.redemption_if_no_ki ?? 0}
-                                        onChange={(e) => handlePayoffChange('redemption_if_no_ki', parseNumber(e.target.value, 0))}
-                                        disabled={!parsedTermSheet}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">KI Redemption</label>
-                                    <select
-                                        className="form-input"
-                                        value={parsedTermSheet?.payoff?.redemption_if_ki ?? 'worst_performance'}
-                                        onChange={(e) => handlePayoffChange('redemption_if_ki', e.target.value)}
-                                        disabled={!parsedTermSheet}
-                                    >
-                                        <option value="worst_performance">Worst Performance</option>
-                                        <option value="par">Par</option>
-                                        <option value="performance">Performance</option>
-                                    </select>
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">KI Redemption Floor</label>
-                                    <input
-                                        className="form-input"
-                                        type="number"
-                                        step="0.01"
-                                        value={parsedTermSheet?.payoff?.ki_redemption_floor ?? 0}
-                                        onChange={(e) => handlePayoffChange('ki_redemption_floor', parseNumber(e.target.value, 0))}
-                                        disabled={!parsedTermSheet}
-                                    />
-                                </div>
+                                {protectionInputs.includes('ki_level') && (
+                                    <div className="form-group">
+                                        <label className="form-label">KI Barrier</label>
+                                        <input
+                                            className="form-input"
+                                            type="number"
+                                            step="0.01"
+                                            value={parsedTermSheet?.ki_barrier?.level ?? 0}
+                                            onChange={(e) => handleKiChange('level', parseNumber(e.target.value, 0))}
+                                            disabled={!parsedTermSheet}
+                                        />
+                                    </div>
+                                )}
+                                {protectionInputs.includes('ki_monitoring') && (
+                                    <div className="form-group">
+                                        <label className="form-label">KI Monitoring</label>
+                                        <select
+                                            className="form-input"
+                                            value={parsedTermSheet?.ki_barrier?.monitoring ?? 'continuous'}
+                                            onChange={(e) => handleKiChange('monitoring', e.target.value)}
+                                            disabled={!parsedTermSheet}
+                                        >
+                                            <option value="continuous">Continuous</option>
+                                            <option value="discrete">Discrete</option>
+                                        </select>
+                                    </div>
+                                )}
+                                {protectionInputs.includes('worst_of') && (
+                                    <div className="form-group">
+                                        <label className="form-label">Worst Of</label>
+                                        <select
+                                            className="form-input"
+                                            value={(parsedTermSheet?.payoff?.worst_of ?? false).toString()}
+                                            onChange={(e) => handlePayoffChange('worst_of', e.target.value === 'true')}
+                                            disabled={!parsedTermSheet}
+                                        >
+                                            <option value="true">Yes</option>
+                                            <option value="false">No</option>
+                                        </select>
+                                    </div>
+                                )}
+                                {protectionInputs.includes('coupon_memory') && (
+                                    <div className="form-group">
+                                        <label className="form-label">Coupon Memory</label>
+                                        <select
+                                            className="form-input"
+                                            value={(parsedTermSheet?.payoff?.coupon_memory ?? false).toString()}
+                                            onChange={(e) => handlePayoffChange('coupon_memory', e.target.value === 'true')}
+                                            disabled={!parsedTermSheet}
+                                        >
+                                            <option value="true">Yes</option>
+                                            <option value="false">No</option>
+                                        </select>
+                                    </div>
+                                )}
+                                {protectionInputs.includes('settlement') && (
+                                    <div className="form-group">
+                                        <label className="form-label">Settlement</label>
+                                        <select
+                                            className="form-input"
+                                            value={parsedTermSheet?.payoff?.settlement ?? 'cash'}
+                                            onChange={(e) => handlePayoffChange('settlement', e.target.value)}
+                                            disabled={!parsedTermSheet}
+                                        >
+                                            <option value="cash">Cash</option>
+                                            <option value="physical">Physical</option>
+                                        </select>
+                                    </div>
+                                )}
+                                {protectionInputs.includes('autocall_redemption') && (
+                                    <div className="form-group">
+                                        <label className="form-label">Autocall Redemption</label>
+                                        <input
+                                            className="form-input"
+                                            type="number"
+                                            step="0.01"
+                                            value={parsedTermSheet?.payoff?.redemption_if_autocall ?? 0}
+                                            onChange={(e) => handlePayoffChange('redemption_if_autocall', parseNumber(e.target.value, 0))}
+                                            disabled={!parsedTermSheet}
+                                        />
+                                    </div>
+                                )}
+                                {protectionInputs.includes('no_ki_redemption') && (
+                                    <div className="form-group">
+                                        <label className="form-label">No KI Redemption</label>
+                                        <input
+                                            className="form-input"
+                                            type="number"
+                                            step="0.01"
+                                            value={parsedTermSheet?.payoff?.redemption_if_no_ki ?? 0}
+                                            onChange={(e) => handlePayoffChange('redemption_if_no_ki', parseNumber(e.target.value, 0))}
+                                            disabled={!parsedTermSheet}
+                                        />
+                                    </div>
+                                )}
+                                {protectionInputs.includes('ki_redemption') && (
+                                    <div className="form-group">
+                                        <label className="form-label">KI Redemption</label>
+                                        <select
+                                            className="form-input"
+                                            value={parsedTermSheet?.payoff?.redemption_if_ki ?? 'worst_performance'}
+                                            onChange={(e) => handlePayoffChange('redemption_if_ki', e.target.value)}
+                                            disabled={!parsedTermSheet}
+                                        >
+                                            <option value="worst_performance">Worst Performance</option>
+                                            <option value="par">Par</option>
+                                            <option value="performance">Performance</option>
+                                        </select>
+                                    </div>
+                                )}
+                                {protectionInputs.includes('ki_redemption_floor') && (
+                                    <div className="form-group">
+                                        <label className="form-label">KI Redemption Floor</label>
+                                        <input
+                                            className="form-input"
+                                            type="number"
+                                            step="0.01"
+                                            value={parsedTermSheet?.payoff?.ki_redemption_floor ?? 0}
+                                            onChange={(e) => handlePayoffChange('ki_redemption_floor', parseNumber(e.target.value, 0))}
+                                            disabled={!parsedTermSheet}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
 
