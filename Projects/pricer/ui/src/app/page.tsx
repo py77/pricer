@@ -51,58 +51,8 @@ type ProtectionInputId =
     | 'ki_redemption'
     | 'ki_redemption_floor';
 
-const PROTECTION_INPUTS: Record<ProtectionInputId, { label: string; description: string }> = {
-    ki_level: {
-        label: 'KI Barrier',
-        description: 'Downside trigger level as % of initial',
-    },
-    ki_monitoring: {
-        label: 'KI Monitoring',
-        description: 'Barrier observation style',
-    },
-    worst_of: {
-        label: 'Worst Of',
-        description: 'Apply worst-of basket payoff',
-    },
-    coupon_memory: {
-        label: 'Coupon Memory',
-        description: 'Accrue missed coupons',
-    },
-    settlement: {
-        label: 'Settlement',
-        description: 'Cash or physical delivery',
-    },
-    autocall_redemption: {
-        label: 'Autocall Redemption',
-        description: 'Redemption amount upon autocall',
-    },
-    no_ki_redemption: {
-        label: 'No KI Redemption',
-        description: 'Maturity redemption if no KI',
-    },
-    ki_redemption: {
-        label: 'KI Redemption',
-        description: 'Maturity rule after KI',
-    },
-    ki_redemption_floor: {
-        label: 'KI Redemption Floor',
-        description: 'Floor applied after KI',
-    },
-};
-
 const PROTECTION_INPUTS_BY_INSTRUMENT: Record<string, ProtectionInputId[]> = {
     autocallable: [
-        'ki_level',
-        'ki_monitoring',
-        'worst_of',
-        'coupon_memory',
-        'settlement',
-        'autocall_redemption',
-        'no_ki_redemption',
-        'ki_redemption',
-        'ki_redemption_floor',
-    ],
-    phoenix: [
         'ki_level',
         'ki_monitoring',
         'worst_of',
@@ -122,32 +72,12 @@ const PROTECTION_INPUTS_BY_INSTRUMENT: Record<string, ProtectionInputId[]> = {
         'ki_redemption',
         'ki_redemption_floor',
     ],
-    'vanilla-options': ['settlement'],
-    fx: ['settlement', 'no_ki_redemption'],
-    rates: ['settlement', 'autocall_redemption', 'no_ki_redemption'],
-    credit: ['settlement', 'no_ki_redemption'],
-    hybrid: [
-        'ki_level',
-        'ki_monitoring',
-        'worst_of',
-        'coupon_memory',
-        'settlement',
-        'autocall_redemption',
-        'no_ki_redemption',
-        'ki_redemption',
-        'ki_redemption_floor',
-    ],
 };
 
 const CATEGORY_PILLS = [
     'All',
     'Autocallable',
-    'Phoenix',
     'Reverse Convertible',
-    'Vanilla Options',
-    'FX',
-    'Rates',
-    'Credit',
 ];
 
 const INSTRUMENTS: InstrumentCard[] = [
@@ -162,16 +92,6 @@ const INSTRUMENTS: InstrumentCard[] = [
         ratings: { rebuild: 4, scale: 3, market: 5 },
     },
     {
-        id: 'phoenix',
-        title: 'Phoenix Note',
-        year: '2023',
-        description: 'Coupon trigger with downside buffer and auto-call step-down.',
-        category: 'Phoenix',
-        metric: 'COUPONED',
-        badge: 'YIELD',
-        ratings: { rebuild: 3, scale: 4, market: 4 },
-    },
-    {
         id: 'reverse-convertible',
         title: 'Reverse Convertible',
         year: '2024',
@@ -180,56 +100,6 @@ const INSTRUMENTS: InstrumentCard[] = [
         metric: 'BUFFERED',
         badge: 'EQUITY',
         ratings: { rebuild: 2, scale: 3, market: 4 },
-    },
-    {
-        id: 'vanilla-options',
-        title: 'Vanilla Options',
-        year: '2022',
-        description: 'Calls and puts for hedging or directional exposure.',
-        category: 'Vanilla Options',
-        metric: 'PLAIN',
-        badge: 'OPTION',
-        ratings: { rebuild: 3, scale: 5, market: 3 },
-    },
-    {
-        id: 'fx',
-        title: 'FX Accrual',
-        year: '2024',
-        description: 'Range accrual structure tied to FX spot levels.',
-        category: 'FX',
-        metric: 'ACCRUAL',
-        badge: 'FX',
-        ratings: { rebuild: 4, scale: 4, market: 3 },
-    },
-    {
-        id: 'rates',
-        title: 'Rates Snowball',
-        year: '2023',
-        description: 'Callable rates note with coupon step-ups and digital payoff.',
-        category: 'Rates',
-        metric: 'CALLABLE',
-        badge: 'RATES',
-        ratings: { rebuild: 3, scale: 3, market: 2 },
-    },
-    {
-        id: 'credit',
-        title: 'Credit Linked',
-        year: '2024',
-        description: 'Credit-linked note referencing single-name default risk.',
-        category: 'Credit',
-        metric: 'RISKY',
-        badge: 'CREDIT',
-        ratings: { rebuild: 2, scale: 2, market: 4 },
-    },
-    {
-        id: 'hybrid',
-        title: 'Hybrid Basket',
-        year: '2023',
-        description: 'Multi-asset basket with dynamic leverage and knock-in.',
-        category: 'Autocallable',
-        metric: 'BASKET',
-        badge: 'MULTI',
-        ratings: { rebuild: 4, scale: 2, market: 5 },
     },
 ];
 
@@ -885,23 +755,6 @@ export default function PricingPage() {
 
                         <div className="term-sheet-section">
                             <div className="term-sheet-section-title">Protection & Redemption</div>
-                            <div className="term-sheet-requirements">
-                                <div className="term-sheet-requirements-title">
-                                    Required inputs for {selectedInstrument?.title ?? 'Instrument'}
-                                </div>
-                                <ul className="term-sheet-requirements-list">
-                                    {protectionInputs.map((inputId) => (
-                                        <li key={inputId}>
-                                            <span className="term-sheet-requirements-label">
-                                                {PROTECTION_INPUTS[inputId].label}
-                                            </span>
-                                            <span className="term-sheet-requirements-note">
-                                                {PROTECTION_INPUTS[inputId].description}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
                             <div className="term-sheet-grid">
                                 {protectionInputs.includes('ki_level') && (
                                     <div className="form-group">
