@@ -1162,26 +1162,60 @@ export default function PricingPage() {
                                 subtitle={marketDataDate ? `As of ${marketDataDate}` : 'Latest underlying prices used for pricing'}
                             >
                                 {(parsedTermSheet?.underlyings || []).length ? (
-                                    <div className="table-container">
-                                        <table>
-                                            <thead>
-                                                <tr>
-                                                    <th>Ticker</th>
-                                                    <th style={{ textAlign: 'right' }}>Spot</th>
-                                                    <th>Currency</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {(parsedTermSheet?.underlyings || []).map((underlying: any, index: number) => (
-                                                    <tr key={`${underlying.id || 'underlying'}-${index}`}>
-                                                        <td>{underlying.id || `Underlying ${index + 1}`}</td>
-                                                        <td style={{ textAlign: 'right' }}>${formatNumber(underlying.spot ?? 0, 2)}</td>
-                                                        <td>{underlying.currency ?? parsedTermSheet?.meta?.currency ?? 'USD'}</td>
+                                    <>
+                                        <div className="table-container">
+                                            <table>
+                                                <thead>
+                                                    <tr>
+                                                        <th>Ticker</th>
+                                                        <th style={{ textAlign: 'right' }}>Spot</th>
+                                                        <th style={{ textAlign: 'right' }}>Vol</th>
+                                                        <th>Currency</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                </thead>
+                                                <tbody>
+                                                    {(parsedTermSheet?.underlyings || []).map((underlying: any, index: number) => {
+                                                        // Extract vol based on model type
+                                                        let vol = 0;
+                                                        if (underlying.vol_model?.type === 'local_stochastic' && underlying.vol_model?.lsv_params?.v0) {
+                                                            vol = Math.sqrt(underlying.vol_model.lsv_params.v0);
+                                                        } else if (underlying.vol_model?.type === 'flat' && underlying.vol_model?.flat_vol) {
+                                                            vol = underlying.vol_model.flat_vol;
+                                                        } else if (underlying.vol_model?.term_structure?.length) {
+                                                            vol = underlying.vol_model.term_structure[0]?.vol || 0;
+                                                        }
+                                                        return (
+                                                            <tr key={`${underlying.id || 'underlying'}-${index}`}>
+                                                                <td>{underlying.id || `Underlying ${index + 1}`}</td>
+                                                                <td style={{ textAlign: 'right' }}>${formatNumber(underlying.spot ?? 0, 2)}</td>
+                                                                <td style={{ textAlign: 'right' }}>{formatPercent(vol)}</td>
+                                                                <td>{underlying.currency ?? parsedTermSheet?.meta?.currency ?? 'USD'}</td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {/* Correlation section */}
+                                        {parsedTermSheet?.correlation?.pairwise && Object.keys(parsedTermSheet.correlation.pairwise).length > 0 && (
+                                            <div style={{ marginTop: '1rem' }}>
+                                                <div style={{ fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Correlations</div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                                    {Object.entries(parsedTermSheet.correlation.pairwise).map(([pair, corr]) => (
+                                                        <span key={pair} style={{
+                                                            padding: '0.25rem 0.5rem',
+                                                            background: 'var(--surface-2)',
+                                                            borderRadius: '4px',
+                                                            fontSize: '0.8rem',
+                                                            fontFamily: 'Consolas, monospace'
+                                                        }}>
+                                                            {pair.replace('_', '/')}: {formatNumber(corr as number, 2)}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
                                 ) : (
                                     <GraveCard>
                                         <div className="card-header">
