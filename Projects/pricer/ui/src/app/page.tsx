@@ -103,6 +103,99 @@ const INSTRUMENTS: InstrumentCard[] = [
     },
 ];
 
+const NASDAQ_TICKERS = [
+    'AAPL',
+    'ABNB',
+    'ADBE',
+    'ADI',
+    'ADP',
+    'ADSK',
+    'AMAT',
+    'AMD',
+    'AMGN',
+    'AMZN',
+    'ASML',
+    'AVGO',
+    'BIDU',
+    'BKNG',
+    'CDNS',
+    'CHTR',
+    'CMCSA',
+    'COST',
+    'CRWD',
+    'CSCO',
+    'CSX',
+    'CTAS',
+    'CTSH',
+    'DDOG',
+    'DLTR',
+    'DOCU',
+    'EA',
+    'EXC',
+    'FAST',
+    'FTNT',
+    'GILD',
+    'GOOG',
+    'GOOGL',
+    'HON',
+    'IDXX',
+    'ILMN',
+    'INTC',
+    'INTU',
+    'ISRG',
+    'JD',
+    'KDP',
+    'KHC',
+    'KLAC',
+    'LRCX',
+    'LULU',
+    'MAR',
+    'MCHP',
+    'MDLZ',
+    'MELI',
+    'META',
+    'MNST',
+    'MRNA',
+    'MRVL',
+    'MSFT',
+    'MU',
+    'NFLX',
+    'NTES',
+    'NVDA',
+    'NXPI',
+    'ORLY',
+    'PANW',
+    'PAYX',
+    'PCAR',
+    'PDD',
+    'PEP',
+    'PYPL',
+    'QCOM',
+    'REGN',
+    'ROST',
+    'SBUX',
+    'SIRI',
+    'SNPS',
+    'TEAM',
+    'TMUS',
+    'TSLA',
+    'TXN',
+    'VRSK',
+    'VRTX',
+    'WBD',
+    'WDAY',
+    'XEL',
+    'ZM',
+    'ZS',
+];
+
+const getTickerOptions = (currentId?: string) => {
+    if (currentId && !NASDAQ_TICKERS.includes(currentId)) {
+        return [currentId, ...NASDAQ_TICKERS];
+    }
+    return NASDAQ_TICKERS;
+};
+
 export default function PricingPage() {
     const [termSheet, setTermSheet] = useState<string>('{}');
     const [config, setConfig] = useState<RunConfig>(DEFAULT_CONFIG);
@@ -612,13 +705,20 @@ export default function PricingPage() {
                                         <div className="term-sheet-grid">
                                             <div className="form-group">
                                                 <label className="form-label">Ticker</label>
-                                                <input
-                                                    className="form-input"
-                                                    type="text"
+                                                <select
+                                                    className="form-input form-select-scroll"
                                                     value={underlying.id ?? ''}
                                                     onChange={(e) => handleUnderlyingChange(index, 'id', e.target.value)}
                                                     disabled={!parsedTermSheet}
-                                                />
+                                                    size={6}
+                                                >
+                                                    <option value="">Select ticker</option>
+                                                    {getTickerOptions(underlying.id).map((ticker) => (
+                                                        <option key={`${ticker}-${index}`} value={ticker}>
+                                                            {ticker}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                             </div>
                                             <div className="form-group">
                                                 <label className="form-label">Spot</label>
