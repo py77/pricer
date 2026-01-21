@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { priceProduct, getExampleSchema, fetchMarketData, PriceResponse, RunConfig } from '@/api/client';
+import { Badge, Frame, GraveCard, MetricChip, PillButton, RatingBars, SearchBar } from '@/components/ui';
 
 // Dynamic import Monaco to avoid SSR issues
 const MonacoEditor = dynamic(
@@ -24,33 +25,114 @@ function formatPercent(n: number): string {
     return (n * 100).toFixed(2) + '%';
 }
 
-// Retro Window Component
-function RetroWindow({ 
-    title, 
-    color = 'cyan', 
-    children 
-}: { 
-    title: string; 
-    color?: 'cyan' | 'yellow' | 'pink' | 'green' | 'blue';
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="retro-window">
-            <div className={`retro-title-bar ${color}`}>
-                <div className="window-dots">
-                    <div className="window-dot red"></div>
-                    <div className="window-dot yellow"></div>
-                    <div className="window-dot green"></div>
-                </div>
-                <span className="window-title">{title}</span>
-                <div style={{ width: '44px' }}></div>
-            </div>
-            <div className="window-content">
-                {children}
-            </div>
-        </div>
-    );
-}
+type InstrumentCard = {
+    id: string;
+    title: string;
+    year: string;
+    description: string;
+    category: string;
+    metric: string;
+    badge: string;
+    ratings: {
+        rebuild: number;
+        scale: number;
+        market: number;
+    };
+};
+
+const CATEGORY_PILLS = [
+    'All',
+    'Autocallable',
+    'Phoenix',
+    'Reverse Convertible',
+    'Vanilla Options',
+    'FX',
+    'Rates',
+    'Credit',
+];
+
+const INSTRUMENTS: InstrumentCard[] = [
+    {
+        id: 'autocallable',
+        title: 'Autocallable',
+        year: '2024',
+        description: 'Barrier autocallable with quarterly observations and memory coupons.',
+        category: 'Autocallable',
+        metric: 'CALLABLE',
+        badge: 'STRUCTURED',
+        ratings: { rebuild: 4, scale: 3, market: 5 },
+    },
+    {
+        id: 'phoenix',
+        title: 'Phoenix Note',
+        year: '2023',
+        description: 'Coupon trigger with downside buffer and auto-call step-down.',
+        category: 'Phoenix',
+        metric: 'COUPONED',
+        badge: 'YIELD',
+        ratings: { rebuild: 3, scale: 4, market: 4 },
+    },
+    {
+        id: 'reverse-convertible',
+        title: 'Reverse Convertible',
+        year: '2024',
+        description: 'Short put profile with enhanced coupon and physical settlement risk.',
+        category: 'Reverse Convertible',
+        metric: 'BUFFERED',
+        badge: 'EQUITY',
+        ratings: { rebuild: 2, scale: 3, market: 4 },
+    },
+    {
+        id: 'vanilla-options',
+        title: 'Vanilla Options',
+        year: '2022',
+        description: 'Calls and puts for hedging or directional exposure.',
+        category: 'Vanilla Options',
+        metric: 'PLAIN',
+        badge: 'OPTION',
+        ratings: { rebuild: 3, scale: 5, market: 3 },
+    },
+    {
+        id: 'fx',
+        title: 'FX Accrual',
+        year: '2024',
+        description: 'Range accrual structure tied to FX spot levels.',
+        category: 'FX',
+        metric: 'ACCRUAL',
+        badge: 'FX',
+        ratings: { rebuild: 4, scale: 4, market: 3 },
+    },
+    {
+        id: 'rates',
+        title: 'Rates Snowball',
+        year: '2023',
+        description: 'Callable rates note with coupon step-ups and digital payoff.',
+        category: 'Rates',
+        metric: 'CALLABLE',
+        badge: 'RATES',
+        ratings: { rebuild: 3, scale: 3, market: 2 },
+    },
+    {
+        id: 'credit',
+        title: 'Credit Linked',
+        year: '2024',
+        description: 'Credit-linked note referencing single-name default risk.',
+        category: 'Credit',
+        metric: 'RISKY',
+        badge: 'CREDIT',
+        ratings: { rebuild: 2, scale: 2, market: 4 },
+    },
+    {
+        id: 'hybrid',
+        title: 'Hybrid Basket',
+        year: '2023',
+        description: 'Multi-asset basket with dynamic leverage and knock-in.',
+        category: 'Autocallable',
+        metric: 'BASKET',
+        badge: 'MULTI',
+        ratings: { rebuild: 4, scale: 2, market: 5 },
+    },
+];
 
 export default function PricingPage() {
     const [termSheet, setTermSheet] = useState<string>('{}');
@@ -60,6 +142,10 @@ export default function PricingPage() {
     const [loading, setLoading] = useState(false);
     const [fetchingData, setFetchingData] = useState(false);
     const [showJson, setShowJson] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [activeCategory, setActiveCategory] = useState('All');
+    const [selectedInstrumentId, setSelectedInstrumentId] = useState('autocallable');
+    const pricerRef = useRef<HTMLDivElement>(null);
 
     const parsedTermSheet = useMemo(() => {
         try {
@@ -68,6 +154,23 @@ export default function PricingPage() {
             return null;
         }
     }, [termSheet]);
+
+    const filteredInstruments = useMemo(() => {
+        const normalizedSearch = searchTerm.trim().toLowerCase();
+        return INSTRUMENTS.filter((instrument) => {
+            const matchesCategory = activeCategory === 'All' || instrument.category === activeCategory;
+            if (!matchesCategory) {
+                return false;
+            }
+            if (!normalizedSearch) {
+                return true;
+            }
+            return (
+                instrument.title.toLowerCase().includes(normalizedSearch) ||
+                instrument.description.toLowerCase().includes(normalizedSearch)
+            );
+        });
+    }, [activeCategory, searchTerm]);
 
     // Load example on mount
     useEffect(() => {
@@ -285,19 +388,105 @@ export default function PricingPage() {
         }
     };
 
+    const handleSelectInstrument = (instrumentId: string) => {
+        setSelectedInstrumentId(instrumentId);
+        requestAnimationFrame(() => {
+            pricerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    };
+
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">Pricing</h1>
-                <p className="page-description">Price autocallable structured products with Monte Carlo simulation</p>
+                <div className="page-title-row">
+                    <div>
+                        <h1 className="page-title">Structured Products Pricer</h1>
+                        <p className="page-description">Price structured products with high-contrast templates</p>
+                    </div>
+                    <a className="btn" href="/risk">Risk</a>
+                </div>
+                <SearchBar
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                    placeholder="SEARCH INSTRUMENTS..."
+                />
+                <div className="pill-row" role="tablist" aria-label="Instrument categories">
+                    {CATEGORY_PILLS.map((pill) => (
+                        <PillButton
+                            key={pill}
+                            active={activeCategory === pill}
+                            onClick={() => setActiveCategory(pill)}
+                            role="tab"
+                            aria-selected={activeCategory === pill}
+                        >
+                            {pill}
+                        </PillButton>
+                    ))}
+                </div>
             </div>
 
-            {/* Controls */}
-            <RetroWindow title="Controls" color="yellow">
+            <Frame
+                title="Instrument templates"
+                subtitle={`${filteredInstruments.length} templates available`}
+            >
+                <div className="card-grid">
+                    {filteredInstruments.map((instrument) => (
+                        <GraveCard
+                            key={instrument.id}
+                            as="button"
+                            className={selectedInstrumentId === instrument.id ? 'grave-card--active' : ''}
+                            onClick={() => handleSelectInstrument(instrument.id)}
+                            aria-label={`Open ${instrument.title} pricer`}
+                        >
+                            <div className="card-header">
+                                <div className="card-title">{instrument.title}</div>
+                                <div className="card-year">{instrument.year}</div>
+                            </div>
+                            <p className="card-description">{instrument.description}</p>
+                            <div className="card-row">
+                                <MetricChip label="Metric" value={instrument.metric} />
+                                <Badge>{instrument.badge}</Badge>
+                            </div>
+                            <div className="card-footer">Hover for details</div>
+                            <div className="card-ratings">
+                                <div className="rating-group">
+                                    <span className="rating-label">
+                                        <span className="rating-icon" aria-hidden />
+                                        Rebuild
+                                    </span>
+                                    <RatingBars value={instrument.ratings.rebuild} color="orange" label="Rebuild rating" />
+                                </div>
+                                <div className="rating-group">
+                                    <span className="rating-label">
+                                        <span className="rating-icon" aria-hidden />
+                                        Scale
+                                    </span>
+                                    <RatingBars value={instrument.ratings.scale} color="blue" label="Scale rating" />
+                                </div>
+                                <div className="rating-group">
+                                    <span className="rating-label">
+                                        <span className="rating-icon" aria-hidden />
+                                        Market
+                                    </span>
+                                    <RatingBars value={instrument.ratings.market} color="orange" label="Market rating" />
+                                </div>
+                            </div>
+                        </GraveCard>
+                    ))}
+                </div>
+            </Frame>
+
+            <div ref={pricerRef} />
+
+            <Frame
+                title={`Pricer workspace · ${INSTRUMENTS.find((instrument) => instrument.id === selectedInstrumentId)?.title ?? 'Instrument'}`}
+                subtitle="Configure inputs and run pricing"
+            >
                 <div className="controls-row">
                     <div className="control-group">
-                        <label className="control-label">Paths</label>
+                        <label className="control-label" htmlFor="paths-input">Paths</label>
                         <input
+                            id="paths-input"
                             type="number"
                             className="control-input"
                             value={config.paths}
@@ -305,8 +494,9 @@ export default function PricingPage() {
                         />
                     </div>
                     <div className="control-group">
-                        <label className="control-label">Seed</label>
+                        <label className="control-label" htmlFor="seed-input">Seed</label>
                         <input
+                            id="seed-input"
                             type="number"
                             className="control-input"
                             value={config.seed}
@@ -314,32 +504,32 @@ export default function PricingPage() {
                         />
                     </div>
                     <div className="control-group">
-                        <label className="control-label">Block Size</label>
+                        <label className="control-label" htmlFor="block-input">Block Size</label>
                         <input
+                            id="block-input"
                             type="number"
                             className="control-input"
                             value={config.block_size}
                             onChange={e => setConfig({ ...config, block_size: parseInt(e.target.value) || 50000 })}
                         />
                     </div>
-                    <button className="btn btn-secondary" onClick={handleLoadExample}>
+                    <button className="btn" onClick={handleLoadExample}>
                         Load Example
                     </button>
-                    <button className="btn btn-secondary" onClick={handleFetchLiveData} disabled={fetchingData}>
+                    <button className="btn" onClick={handleFetchLiveData} disabled={fetchingData}>
                         {fetchingData ? 'Fetching...' : 'Fetch Live Data'}
                     </button>
                     <button className="btn btn-primary" onClick={handleRunPricing} disabled={loading}>
                         {loading ? 'Running...' : 'Run Pricing'}
                     </button>
                 </div>
-            </RetroWindow>
+            </Frame>
 
             {error && <div className="error-box" style={{ marginBottom: '1rem' }}>{error}</div>}
 
             <div className="editor-layout">
-                {/* Editor Panel */}
                 <div className="editor-panel">
-                    <RetroWindow title="Term Sheet Builder" color="cyan">
+                    <Frame title="Term Sheet Builder" subtitle="Autocallable configuration">
                         {!parsedTermSheet && (
                             <div className="error-box" style={{ marginBottom: '1rem' }}>
                                 Invalid JSON detected. Fix the JSON to continue using the builder.
@@ -757,7 +947,7 @@ export default function PricingPage() {
                                 />
                             </div>
                         )}
-                    </RetroWindow>
+                    </Frame>
                 </div>
 
                 {/* Results Panel */}
@@ -765,61 +955,48 @@ export default function PricingPage() {
                     {result ? (
                         <>
                             {/* Summary Cards */}
-                            <RetroWindow title="Summary" color="green">
-                                <div className="card-grid">
-                                    <div className="card">
-                                        <div className="stat-value">${formatNumber(result.summary.pv, 0)}</div>
-                                        <div className="stat-label">Present Value</div>
+                            <Frame title="Summary" subtitle="Key pricing metrics">
+                                <GraveCard>
+                                    <div className="card-header">
+                                        <div className="card-title">Pricing output</div>
+                                        <Badge>Priced</Badge>
                                     </div>
-                                    <div className="card">
-                                        <div className="stat-value">{formatPercent(result.summary.pv_pct_notional)}</div>
-                                        <div className="stat-label">PV % of Notional</div>
+                                    <div className="metric-grid">
+                                        <MetricChip label="Price" value={`$${formatNumber(result.summary.pv, 0)}`} />
+                                        <MetricChip label="PV % Notional" value={formatPercent(result.summary.pv_pct_notional)} />
+                                        <MetricChip label="Autocall Prob" value={formatPercent(result.summary.autocall_probability)} />
+                                        <MetricChip label="KI Probability" value={formatPercent(result.summary.ki_probability)} />
+                                        <MetricChip label="Expected Coupons" value={result.summary.expected_coupon_count.toFixed(2)} />
+                                        <MetricChip label="Expected Life" value={`${result.summary.expected_life_years.toFixed(2)}y`} />
                                     </div>
-                                    <div className="card">
-                                        <div className="stat-value">{formatPercent(result.summary.autocall_probability)}</div>
-                                        <div className="stat-label">Autocall Prob</div>
+                                    <div className="results-meta">
+                                        <span>Risk posture</span>
+                                        <RatingBars
+                                            value={result.summary.ki_probability * 5}
+                                            color="orange"
+                                            label="Risk rating"
+                                        />
                                     </div>
-                                    <div className="card">
-                                        <div className="stat-value">{formatPercent(result.summary.ki_probability)}</div>
-                                        <div className="stat-label">KI Probability</div>
-                                    </div>
-                                    <div className="card">
-                                        <div className="stat-value">{result.summary.expected_coupon_count.toFixed(2)}</div>
-                                        <div className="stat-label">Expected Coupons</div>
-                                    </div>
-                                    <div className="card">
-                                        <div className="stat-value">{result.summary.expected_life_years.toFixed(2)}y</div>
-                                        <div className="stat-label">Expected Life</div>
-                                    </div>
-                                </div>
-                            </RetroWindow>
+                                </GraveCard>
+                            </Frame>
 
                             {/* Decomposition */}
-                            <RetroWindow title="PV Decomposition" color="pink">
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                                    <div>
-                                        <div style={{ color: 'var(--success)', fontSize: '1.25rem', fontWeight: 700 }}>
-                                            ${formatNumber(result.decomposition.coupon_pv, 0)}
-                                        </div>
-                                        <div className="stat-label">Coupon PV</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ color: 'var(--primary)', fontSize: '1.25rem', fontWeight: 700 }}>
-                                            ${formatNumber(result.decomposition.autocall_redemption_pv, 0)}
-                                        </div>
-                                        <div className="stat-label">Autocall Redemption</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ color: 'var(--warning)', fontSize: '1.25rem', fontWeight: 700 }}>
-                                            ${formatNumber(result.decomposition.maturity_redemption_pv, 0)}
-                                        </div>
-                                        <div className="stat-label">Maturity Redemption</div>
-                                    </div>
+                            <Frame title="PV Decomposition" subtitle="Component breakdown">
+                                <div className="metric-grid">
+                                    <MetricChip label="Coupon PV" value={`$${formatNumber(result.decomposition.coupon_pv, 0)}`} />
+                                    <MetricChip
+                                        label="Autocall Redemption"
+                                        value={`$${formatNumber(result.decomposition.autocall_redemption_pv, 0)}`}
+                                    />
+                                    <MetricChip
+                                        label="Maturity Redemption"
+                                        value={`$${formatNumber(result.decomposition.maturity_redemption_pv, 0)}`}
+                                    />
                                 </div>
-                            </RetroWindow>
+                            </Frame>
 
                             {/* Cashflows Table */}
-                            <RetroWindow title="Expected Cashflows" color="blue">
+                            <Frame title="Expected Cashflows" subtitle="Projected payoffs">
                                 <div className="table-container">
                                     <table>
                                         <thead>
@@ -844,26 +1021,30 @@ export default function PricingPage() {
                                         </tbody>
                                     </table>
                                 </div>
-                            </RetroWindow>
+                            </Frame>
 
                             {/* Stats */}
-                            <RetroWindow title="Statistics" color="cyan">
-                                <div style={{ display: 'flex', gap: '2rem', fontSize: '13px' }}>
+                            <Frame title="Statistics" subtitle="Simulation health">
+                                <div className="results-meta">
                                     <span>Paths: {result.summary.num_paths.toLocaleString()}</span>
                                     <span>Std Error: ${formatNumber(result.summary.pv_std_error)}</span>
                                     <span>Time: {result.summary.computation_time_ms.toFixed(0)}ms</span>
                                 </div>
-                            </RetroWindow>
+                            </Frame>
                         </>
                     ) : (
-                        <RetroWindow title="Results" color="green">
-                            <div style={{ textAlign: 'center', padding: '2rem' }}>
-                                <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
-                                <div style={{ color: 'var(--muted)' }}>
-                                    Click "Run Pricing" to calculate PV and statistics
+                        <Frame title="Results" subtitle="Awaiting pricing run">
+                            <GraveCard>
+                                <div className="card-header">
+                                    <div className="card-title">No results yet</div>
+                                    <Badge>Waiting</Badge>
                                 </div>
-                            </div>
-                        </RetroWindow>
+                                <p className="card-description">
+                                    Click run pricing to calculate PV, risk metrics, and cashflow projections.
+                                </p>
+                                <div className="card-footer">Hover for details</div>
+                            </GraveCard>
+                        </Frame>
                     )}
                 </div>
             </div>
