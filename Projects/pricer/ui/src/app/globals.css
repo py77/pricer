@@ -519,6 +519,20 @@ a:hover {
   align-items: start;
 }
 
+.term-sheet-underlyings-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.term-sheet-underlyings-header .form-group {
+  margin-bottom: 0;
+  min-width: 200px;
+}
+
 .term-sheet-card {
   border: var(--border-thick) solid var(--color-border);
   padding: 0.75rem;

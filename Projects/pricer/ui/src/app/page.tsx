@@ -355,9 +355,67 @@ export default function PricingPage() {
         return Number.isNaN(parsed) ? fallback : parsed;
     };
 
+    const buildUnderlyingTemplate = (draft: any, reference?: any) => {
+        const base = reference ? JSON.parse(JSON.stringify(reference)) : {};
+        const currency = draft?.meta?.currency ?? 'USD';
+        return {
+            id: '',
+            spot: base.spot ?? 0,
+            currency: base.currency ?? currency,
+            dividend_model: base.dividend_model
+                ? {
+                    ...base.dividend_model,
+                    continuous_yield: base.dividend_model?.continuous_yield ?? 0,
+                    discrete_dividends: base.dividend_model?.discrete_dividends ?? [],
+                }
+                : { type: 'continuous', continuous_yield: 0 },
+            vol_model: base.vol_model ?? {
+                type: 'local_stochastic',
+                lsv_params: {
+                    v0: 0.1,
+                    theta: 0.1,
+                    kappa: 2,
+                    xi: 0.3,
+                    rho: -0.7,
+                },
+            },
+        };
+    };
+
+    const pruneCorrelationPairs = (draft: any, validIds: string[]) => {
+        if (!draft.correlation?.pairwise) {
+            return;
+        }
+        const validSet = new Set(validIds.filter(Boolean));
+        const nextPairs = Object.fromEntries(
+            Object.entries(draft.correlation.pairwise).filter(([pair]) => {
+                const [left, right] = pair.split('_');
+                return validSet.has(left) && validSet.has(right);
+            })
+        );
+        draft.correlation = { ...draft.correlation, pairwise: nextPairs };
+    };
+
     const handleMetaChange = (field: string, value: string | number) => {
         updateTermSheet(draft => {
             draft.meta = { ...draft.meta, [field]: value };
+        });
+    };
+
+    const handleUnderlyingCountChange = (value: string) => {
+        const desiredCount = Math.max(1, Math.floor(parseNumber(value, 1)));
+        updateTermSheet(draft => {
+            const underlyings = [...(draft.underlyings || [])];
+            if (underlyings.length > desiredCount) {
+                underlyings.splice(desiredCount);
+            } else if (underlyings.length < desiredCount) {
+                const reference = underlyings[underlyings.length - 1] ?? underlyings[0];
+                for (let i = underlyings.length; i < desiredCount; i += 1) {
+                    underlyings.push(buildUnderlyingTemplate(draft, reference));
+                }
+            }
+            draft.underlyings = underlyings;
+            pruneCorrelationPairs(draft, underlyings.map((item: any) => item.id));
         });
     };
 
@@ -695,6 +753,19 @@ export default function PricingPage() {
 
                         <div className="term-sheet-section">
                             <div className="term-sheet-section-title">Underlyings</div>
+                            <div className="term-sheet-underlyings-header">
+                                <div className="form-group">
+                                    <label className="form-label">Number of underlyings</label>
+                                    <input
+                                        className="form-input"
+                                        type="number"
+                                        min={1}
+                                        value={(parsedTermSheet?.underlyings || []).length || 1}
+                                        onChange={(e) => handleUnderlyingCountChange(e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                            </div>
                             <div className="term-sheet-underlyings">
                                 {(parsedTermSheet?.underlyings || []).map((underlying: any, index: number) => (
                                     <div className="term-sheet-card" key={`${underlying.id}-${index}`}>
@@ -706,11 +777,11 @@ export default function PricingPage() {
                                             <div className="form-group">
                                                 <label className="form-label">Ticker</label>
                                                 <select
-                                                    className="form-input form-select-scroll"
+                                                    className={`form-input ${underlying.id ? '' : 'form-select-scroll'}`}
                                                     value={underlying.id ?? ''}
                                                     onChange={(e) => handleUnderlyingChange(index, 'id', e.target.value)}
                                                     disabled={!parsedTermSheet}
-                                                    size={6}
+                                                    size={underlying.id ? 1 : 6}
                                                 >
                                                     <option value="">Select ticker</option>
                                                     {getTickerOptions(underlying.id).map((ticker) => (
