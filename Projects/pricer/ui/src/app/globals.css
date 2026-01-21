@@ -472,6 +472,46 @@ a:hover {
   gap: 0.75rem;
 }
 
+.term-sheet-requirements {
+  border: var(--border-thick) dashed var(--color-border);
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: #f7f7f7;
+}
+
+.term-sheet-requirements-title {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.term-sheet-requirements-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.term-sheet-requirements-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.term-sheet-requirements-label {
+  font-weight: 600;
+}
+
+.term-sheet-requirements-note {
+  color: #555;
+  text-align: right;
+  flex: 1;
+}
+
 .term-sheet-underlyings {
   display: grid;
   gap: 0.75rem;
