@@ -484,7 +484,7 @@ export default function PricingPage() {
         });
     };
 
-    const handleUnderlyingChange = (index: number, field: string, value: string | number) => {
+    const handleUnderlyingChange = async (index: number, field: string, value: string | number) => {
         updateTermSheet(draft => {
             const underlyings = [...(draft.underlyings || [])];
             if (!underlyings[index]) {
@@ -493,6 +493,37 @@ export default function PricingPage() {
             underlyings[index] = { ...underlyings[index], [field]: value };
             draft.underlyings = underlyings;
         });
+
+        // Auto-fetch spot when ticker ID changes
+        if (field === 'id' && typeof value === 'string' && value.trim()) {
+            try {
+                const spots = await fetchMarketData([value.trim()]);
+                if (spots.underlyings[value.trim()]) {
+                    const marketData = spots.underlyings[value.trim()];
+                    updateTermSheet(draft => {
+                        const underlyings = [...(draft.underlyings || [])];
+                        if (underlyings[index]) {
+                            underlyings[index] = {
+                                ...underlyings[index],
+                                spot: marketData.spot,
+                            };
+                            // Update vol if using LSV
+                            if (underlyings[index].vol_model?.type === 'local_stochastic') {
+                                const historicalVar = marketData.historical_vol * marketData.historical_vol;
+                                underlyings[index].vol_model.lsv_params = {
+                                    ...underlyings[index].vol_model.lsv_params,
+                                    v0: historicalVar,
+                                    theta: historicalVar,
+                                };
+                            }
+                            draft.underlyings = underlyings;
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to fetch spot for ticker:', value, err);
+            }
+        }
     };
 
     const handleDividendTypeChange = (index: number, value: string) => {
