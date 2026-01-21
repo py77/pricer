@@ -253,6 +253,7 @@ a:hover {
   color: var(--color-muted);
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-transform: uppercase;
@@ -687,4 +688,104 @@ td {
   letter-spacing: 0.08em;
   font-size: 0.7rem;
   font-weight: 700;
+}
+
+/* ========================================
+   Animations & Transitions
+   ======================================== */
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.2s ease-out;
+}
+
+/* Smooth transitions for interactive elements */
+.btn,
+.pill-button,
+.form-input,
+.control-input,
+.grave-card--interactive {
+  transition: all 0.15s ease;
+}
+
+.btn:hover:not(:disabled),
+.pill-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.15);
+}
+
+.btn:active:not(:disabled),
+.pill-button:active {
+  transform: translateY(0);
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.grave-card--interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.15);
+}
+
+.form-input:focus,
+.control-input:focus {
+  border-color: var(--color-accent);
+}
+
+/* Loading skeleton */
+@keyframes skeleton-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background: #e0e0e0;
+  border-radius: var(--radius-sm);
 }

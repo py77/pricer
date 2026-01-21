@@ -2,6 +2,9 @@
 
 import React from 'react';
 
+export { Tooltip } from './ui/Tooltip';
+export { FormField } from './ui/FormField';
+
 type SearchBarProps = {
   id?: string;
   value: string;
