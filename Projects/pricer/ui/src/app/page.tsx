@@ -299,8 +299,8 @@ export default function PricingPage() {
         parsed.meta = {
             ...parsed.meta,
             valuation_date: todayStr,
-            trade_date: shiftDate(parsed.meta?.trade_date || todayStr),
-            settlement_date: shiftDate(parsed.meta?.settlement_date || todayStr),
+            trade_date: todayStr,
+            settlement_date: todayStr,
             maturity_date: shiftDate(parsed.meta?.maturity_date || todayStr),
             maturity_payment_date: shiftDate(parsed.meta?.maturity_payment_date || todayStr),
         };
@@ -342,9 +342,9 @@ export default function PricingPage() {
                 if (underlying.vol_model?.type === 'flat') {
                     underlying.vol_model.flat_vol = data.historical_vol;
                 }
-                // Update dividend yield if continuous
+                // Update dividend yield if continuous (cap at 0.5 to pass schema validation)
                 if (underlying.dividend_model?.type === 'continuous') {
-                    underlying.dividend_model.continuous_yield = data.dividend_yield || 0;
+                    underlying.dividend_model.continuous_yield = Math.min(data.dividend_yield || 0, 0.5);
                 }
                 // Shift discrete dividend dates
                 if (underlying.dividend_model?.discrete_dividends) {
