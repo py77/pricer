@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { priceProduct, getExampleSchema, fetchMarketData, PriceResponse, RunConfig } from '@/api/client';
 
@@ -59,6 +59,15 @@ export default function PricingPage() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [fetchingData, setFetchingData] = useState(false);
+    const [showJson, setShowJson] = useState(false);
+
+    const parsedTermSheet = useMemo(() => {
+        try {
+            return JSON.parse(termSheet);
+        } catch (err) {
+            return null;
+        }
+    }, [termSheet]);
 
     // Load example on mount
     useEffect(() => {
@@ -167,6 +176,99 @@ export default function PricingPage() {
         }
     };
 
+    const updateTermSheet = (updater: (draft: any) => void) => {
+        if (!parsedTermSheet) {
+            return;
+        }
+        const draft = JSON.parse(JSON.stringify(parsedTermSheet));
+        updater(draft);
+        setTermSheet(JSON.stringify(draft, null, 2));
+    };
+
+    const parseNumber = (value: string, fallback = 0) => {
+        const parsed = Number.parseFloat(value);
+        return Number.isNaN(parsed) ? fallback : parsed;
+    };
+
+    const handleMetaChange = (field: string, value: string | number) => {
+        updateTermSheet(draft => {
+            draft.meta = { ...draft.meta, [field]: value };
+        });
+    };
+
+    const handleUnderlyingChange = (index: number, field: string, value: string | number) => {
+        updateTermSheet(draft => {
+            const underlyings = [...(draft.underlyings || [])];
+            if (!underlyings[index]) {
+                return;
+            }
+            underlyings[index] = { ...underlyings[index], [field]: value };
+            draft.underlyings = underlyings;
+        });
+    };
+
+    const handleDividendTypeChange = (index: number, value: string) => {
+        updateTermSheet(draft => {
+            const underlyings = [...(draft.underlyings || [])];
+            if (!underlyings[index]) {
+                return;
+            }
+            underlyings[index] = {
+                ...underlyings[index],
+                dividend_model: value === 'continuous'
+                    ? { type: 'continuous', continuous_yield: underlyings[index].dividend_model?.continuous_yield ?? 0 }
+                    : { type: 'discrete', discrete_dividends: underlyings[index].dividend_model?.discrete_dividends ?? [] }
+            };
+            draft.underlyings = underlyings;
+        });
+    };
+
+    const handleContinuousYieldChange = (index: number, value: string) => {
+        updateTermSheet(draft => {
+            const underlyings = [...(draft.underlyings || [])];
+            if (!underlyings[index]) {
+                return;
+            }
+            underlyings[index] = {
+                ...underlyings[index],
+                dividend_model: {
+                    ...(underlyings[index].dividend_model || { type: 'continuous' }),
+                    type: 'continuous',
+                    continuous_yield: parseNumber(value, 0)
+                }
+            };
+            draft.underlyings = underlyings;
+        });
+    };
+
+    const handleScheduleChange = (index: number, field: string, value: string | number) => {
+        updateTermSheet(draft => {
+            const schedules = {
+                observation_dates: [],
+                payment_dates: [],
+                autocall_levels: [],
+                coupon_barriers: [],
+                coupon_rates: [],
+                ...draft.schedules
+            };
+            const next = [...(schedules as any)[field]];
+            next[index] = value;
+            draft.schedules = { ...schedules, [field]: next };
+        });
+    };
+
+    const handlePayoffChange = (field: string, value: string | number | boolean) => {
+        updateTermSheet(draft => {
+            draft.payoff = { ...draft.payoff, [field]: value };
+        });
+    };
+
+    const handleKiChange = (field: string, value: string | number) => {
+        updateTermSheet(draft => {
+            draft.ki_barrier = { ...draft.ki_barrier, [field]: value };
+        });
+    };
+
     const handleRunPricing = async () => {
         setLoading(true);
         setError(null);
@@ -237,24 +339,424 @@ export default function PricingPage() {
             <div className="editor-layout">
                 {/* Editor Panel */}
                 <div className="editor-panel">
-                    <RetroWindow title="Term Sheet (JSON)" color="cyan">
-                        <div className="editor-container" style={{ margin: '-12px', marginTop: '-12px' }}>
-                            <MonacoEditor
-                                height="400px"
-                                language="json"
-                                theme="vs"
-                                value={termSheet}
-                                onChange={(value) => setTermSheet(value || '{}')}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 13,
-                                    lineNumbers: 'on',
-                                    scrollBeyondLastLine: false,
-                                    wordWrap: 'on',
-                                    fontFamily: 'Consolas, monospace',
-                                }}
-                            />
+                    <RetroWindow title="Term Sheet Builder" color="cyan">
+                        {!parsedTermSheet && (
+                            <div className="error-box" style={{ marginBottom: '1rem' }}>
+                                Invalid JSON detected. Fix the JSON to continue using the builder.
+                            </div>
+                        )}
+                        <div className="term-sheet-section">
+                            <div className="term-sheet-section-title">Product Overview</div>
+                            <div className="term-sheet-grid">
+                                <div className="form-group">
+                                    <label className="form-label">Product ID</label>
+                                    <input
+                                        className="form-input"
+                                        type="text"
+                                        value={parsedTermSheet?.meta?.product_id ?? ''}
+                                        onChange={(e) => handleMetaChange('product_id', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Currency</label>
+                                    <input
+                                        className="form-input"
+                                        type="text"
+                                        value={parsedTermSheet?.meta?.currency ?? ''}
+                                        onChange={(e) => handleMetaChange('currency', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Notional</label>
+                                    <input
+                                        className="form-input"
+                                        type="number"
+                                        value={parsedTermSheet?.meta?.notional ?? ''}
+                                        onChange={(e) => handleMetaChange('notional', parseNumber(e.target.value, 0))}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                            </div>
                         </div>
+
+                        <div className="term-sheet-section">
+                            <div className="term-sheet-section-title">Key Dates</div>
+                            <div className="term-sheet-grid">
+                                <div className="form-group">
+                                    <label className="form-label">Trade Date</label>
+                                    <input
+                                        className="form-input"
+                                        type="date"
+                                        value={parsedTermSheet?.meta?.trade_date ?? ''}
+                                        onChange={(e) => handleMetaChange('trade_date', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Valuation Date</label>
+                                    <input
+                                        className="form-input"
+                                        type="date"
+                                        value={parsedTermSheet?.meta?.valuation_date ?? ''}
+                                        onChange={(e) => handleMetaChange('valuation_date', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Settlement Date</label>
+                                    <input
+                                        className="form-input"
+                                        type="date"
+                                        value={parsedTermSheet?.meta?.settlement_date ?? ''}
+                                        onChange={(e) => handleMetaChange('settlement_date', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Maturity Date</label>
+                                    <input
+                                        className="form-input"
+                                        type="date"
+                                        value={parsedTermSheet?.meta?.maturity_date ?? ''}
+                                        onChange={(e) => handleMetaChange('maturity_date', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Payment Date</label>
+                                    <input
+                                        className="form-input"
+                                        type="date"
+                                        value={parsedTermSheet?.meta?.maturity_payment_date ?? ''}
+                                        onChange={(e) => handleMetaChange('maturity_payment_date', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="term-sheet-section">
+                            <div className="term-sheet-section-title">Underlyings</div>
+                            <div className="term-sheet-underlyings">
+                                {(parsedTermSheet?.underlyings || []).map((underlying: any, index: number) => (
+                                    <div className="term-sheet-card" key={`${underlying.id}-${index}`}>
+                                        <div className="term-sheet-card-title">
+                                            <span>{underlying.id || `Underlying ${index + 1}`}</span>
+                                            <span className="pill">{underlying.vol_model?.type ?? 'model'}</span>
+                                        </div>
+                                        <div className="term-sheet-grid">
+                                            <div className="form-group">
+                                                <label className="form-label">Ticker</label>
+                                                <input
+                                                    className="form-input"
+                                                    type="text"
+                                                    value={underlying.id ?? ''}
+                                                    onChange={(e) => handleUnderlyingChange(index, 'id', e.target.value)}
+                                                    disabled={!parsedTermSheet}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="form-label">Spot</label>
+                                                <input
+                                                    className="form-input"
+                                                    type="number"
+                                                    value={underlying.spot ?? ''}
+                                                    onChange={(e) => handleUnderlyingChange(index, 'spot', parseNumber(e.target.value, 0))}
+                                                    disabled={!parsedTermSheet}
+                                                />
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="form-label">Dividend Type</label>
+                                                <select
+                                                    className="form-input"
+                                                    value={underlying.dividend_model?.type ?? 'continuous'}
+                                                    onChange={(e) => handleDividendTypeChange(index, e.target.value)}
+                                                    disabled={!parsedTermSheet}
+                                                >
+                                                    <option value="continuous">Continuous</option>
+                                                    <option value="discrete">Discrete</option>
+                                                </select>
+                                            </div>
+                                            {underlying.dividend_model?.type === 'continuous' ? (
+                                                <div className="form-group">
+                                                    <label className="form-label">Dividend Yield</label>
+                                                    <input
+                                                        className="form-input"
+                                                        type="number"
+                                                        step="0.0001"
+                                                        value={underlying.dividend_model?.continuous_yield ?? 0}
+                                                        onChange={(e) => handleContinuousYieldChange(index, e.target.value)}
+                                                        disabled={!parsedTermSheet}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="form-group">
+                                                    <label className="form-label">Discrete Dividends</label>
+                                                    <input
+                                                        className="form-input"
+                                                        type="text"
+                                                        value={`${underlying.dividend_model?.discrete_dividends?.length ?? 0} entries`}
+                                                        disabled
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="form-group">
+                                                <label className="form-label">Vol Params</label>
+                                                <input
+                                                    className="form-input"
+                                                    type="text"
+                                                    value={underlying.vol_model?.type === 'local_stochastic'
+                                                        ? `v0 ${underlying.vol_model?.lsv_params?.v0 ?? '-'} | xi ${underlying.vol_model?.lsv_params?.xi ?? '-'}`
+                                                        : underlying.vol_model?.type ?? 'N/A'}
+                                                    disabled
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="term-sheet-section">
+                            <div className="term-sheet-section-title">Schedule & Coupons</div>
+                            <div className="table-container term-sheet-table">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Obs Date</th>
+                                            <th>Pay Date</th>
+                                            <th>Autocall</th>
+                                            <th>Coupon Barrier</th>
+                                            <th>Coupon Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(parsedTermSheet?.schedules?.observation_dates || []).map((date: string, index: number) => (
+                                            <tr key={`schedule-${index}`}>
+                                                <td>
+                                                    <input
+                                                        className="table-input"
+                                                        type="date"
+                                                        value={date}
+                                                        onChange={(e) => handleScheduleChange(index, 'observation_dates', e.target.value)}
+                                                        disabled={!parsedTermSheet}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        className="table-input"
+                                                        type="date"
+                                                        value={parsedTermSheet?.schedules?.payment_dates?.[index] ?? ''}
+                                                        onChange={(e) => handleScheduleChange(index, 'payment_dates', e.target.value)}
+                                                        disabled={!parsedTermSheet}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        className="table-input"
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={parsedTermSheet?.schedules?.autocall_levels?.[index] ?? 0}
+                                                        onChange={(e) => handleScheduleChange(index, 'autocall_levels', parseNumber(e.target.value, 0))}
+                                                        disabled={!parsedTermSheet}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        className="table-input"
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={parsedTermSheet?.schedules?.coupon_barriers?.[index] ?? 0}
+                                                        onChange={(e) => handleScheduleChange(index, 'coupon_barriers', parseNumber(e.target.value, 0))}
+                                                        disabled={!parsedTermSheet}
+                                                    />
+                                                </td>
+                                                <td>
+                                                    <input
+                                                        className="table-input"
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={parsedTermSheet?.schedules?.coupon_rates?.[index] ?? 0}
+                                                        onChange={(e) => handleScheduleChange(index, 'coupon_rates', parseNumber(e.target.value, 0))}
+                                                        disabled={!parsedTermSheet}
+                                                    />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="term-sheet-section">
+                            <div className="term-sheet-section-title">Protection & Redemption</div>
+                            <div className="term-sheet-grid">
+                                <div className="form-group">
+                                    <label className="form-label">KI Barrier</label>
+                                    <input
+                                        className="form-input"
+                                        type="number"
+                                        step="0.01"
+                                        value={parsedTermSheet?.ki_barrier?.level ?? 0}
+                                        onChange={(e) => handleKiChange('level', parseNumber(e.target.value, 0))}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">KI Monitoring</label>
+                                    <select
+                                        className="form-input"
+                                        value={parsedTermSheet?.ki_barrier?.monitoring ?? 'continuous'}
+                                        onChange={(e) => handleKiChange('monitoring', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    >
+                                        <option value="continuous">Continuous</option>
+                                        <option value="discrete">Discrete</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Worst Of</label>
+                                    <select
+                                        className="form-input"
+                                        value={(parsedTermSheet?.payoff?.worst_of ?? false).toString()}
+                                        onChange={(e) => handlePayoffChange('worst_of', e.target.value === 'true')}
+                                        disabled={!parsedTermSheet}
+                                    >
+                                        <option value="true">Yes</option>
+                                        <option value="false">No</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Coupon Memory</label>
+                                    <select
+                                        className="form-input"
+                                        value={(parsedTermSheet?.payoff?.coupon_memory ?? false).toString()}
+                                        onChange={(e) => handlePayoffChange('coupon_memory', e.target.value === 'true')}
+                                        disabled={!parsedTermSheet}
+                                    >
+                                        <option value="true">Yes</option>
+                                        <option value="false">No</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Settlement</label>
+                                    <select
+                                        className="form-input"
+                                        value={parsedTermSheet?.payoff?.settlement ?? 'cash'}
+                                        onChange={(e) => handlePayoffChange('settlement', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    >
+                                        <option value="cash">Cash</option>
+                                        <option value="physical">Physical</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Autocall Redemption</label>
+                                    <input
+                                        className="form-input"
+                                        type="number"
+                                        step="0.01"
+                                        value={parsedTermSheet?.payoff?.redemption_if_autocall ?? 0}
+                                        onChange={(e) => handlePayoffChange('redemption_if_autocall', parseNumber(e.target.value, 0))}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">No KI Redemption</label>
+                                    <input
+                                        className="form-input"
+                                        type="number"
+                                        step="0.01"
+                                        value={parsedTermSheet?.payoff?.redemption_if_no_ki ?? 0}
+                                        onChange={(e) => handlePayoffChange('redemption_if_no_ki', parseNumber(e.target.value, 0))}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">KI Redemption</label>
+                                    <select
+                                        className="form-input"
+                                        value={parsedTermSheet?.payoff?.redemption_if_ki ?? 'worst_performance'}
+                                        onChange={(e) => handlePayoffChange('redemption_if_ki', e.target.value)}
+                                        disabled={!parsedTermSheet}
+                                    >
+                                        <option value="worst_performance">Worst Performance</option>
+                                        <option value="par">Par</option>
+                                        <option value="performance">Performance</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">KI Redemption Floor</label>
+                                    <input
+                                        className="form-input"
+                                        type="number"
+                                        step="0.01"
+                                        value={parsedTermSheet?.payoff?.ki_redemption_floor ?? 0}
+                                        onChange={(e) => handlePayoffChange('ki_redemption_floor', parseNumber(e.target.value, 0))}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="term-sheet-section">
+                            <div className="term-sheet-section-title">Market Data</div>
+                            <div className="term-sheet-grid">
+                                <div className="form-group">
+                                    <label className="form-label">Discount Curve</label>
+                                    <input
+                                        className="form-input"
+                                        type="number"
+                                        step="0.0001"
+                                        value={parsedTermSheet?.discount_curve?.flat_rate ?? 0}
+                                        onChange={(e) => updateTermSheet(draft => {
+                                            draft.discount_curve = {
+                                                ...draft.discount_curve,
+                                                flat_rate: parseNumber(e.target.value, 0)
+                                            };
+                                        })}
+                                        disabled={!parsedTermSheet}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Correlation Pairs</label>
+                                    <input
+                                        className="form-input"
+                                        type="text"
+                                        value={`${Object.keys(parsedTermSheet?.correlation?.pairwise ?? {}).length} pairs`}
+                                        disabled
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="term-sheet-actions">
+                            <button className="btn btn-secondary" onClick={() => setShowJson(!showJson)}>
+                                {showJson ? 'Hide JSON' : 'Advanced JSON'}
+                            </button>
+                        </div>
+
+                        {showJson && (
+                            <div className="editor-container" style={{ marginTop: '0.75rem' }}>
+                                <MonacoEditor
+                                    height="320px"
+                                    language="json"
+                                    theme="vs"
+                                    value={termSheet}
+                                    onChange={(value) => setTermSheet(value || '{}')}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        fontSize: 13,
+                                        lineNumbers: 'on',
+                                        scrollBeyondLastLine: false,
+                                        wordWrap: 'on',
+                                        fontFamily: 'Consolas, monospace',
+                                    }}
+                                />
+                            </div>
+                        )}
                     </RetroWindow>
                 </div>
 
