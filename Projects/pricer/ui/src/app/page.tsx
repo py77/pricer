@@ -251,89 +251,93 @@ export default function PricingPage() {
         }
     };
 
+    const refreshTermSheetWithMarketData = async (parsed: any) => {
+        // Extract tickers from term sheet
+        const tickers: string[] = (parsed.underlyings || []).map((u: any) => u.id);
+        if (tickers.length === 0) {
+            throw new Error('No underlyings found in term sheet');
+        }
+
+        // Fetch live market data
+        const marketData = await fetchMarketData(tickers);
+
+        // Calculate date shift: from old valuation_date to today
+        const oldValDate = new Date(parsed.meta?.valuation_date || new Date());
+        const today = new Date();
+        const dayShift = Math.round((today.getTime() - oldValDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Helper to shift a date string by dayShift days
+        const shiftDate = (dateStr: string): string => {
+            const d = new Date(dateStr);
+            d.setDate(d.getDate() + dayShift);
+            return d.toISOString().split('T')[0];
+        };
+
+        // Update meta dates
+        const todayStr = today.toISOString().split('T')[0];
+        parsed.meta = {
+            ...parsed.meta,
+            valuation_date: todayStr,
+            trade_date: shiftDate(parsed.meta?.trade_date || todayStr),
+            settlement_date: shiftDate(parsed.meta?.settlement_date || todayStr),
+            maturity_date: shiftDate(parsed.meta?.maturity_date || todayStr),
+            maturity_payment_date: shiftDate(parsed.meta?.maturity_payment_date || todayStr),
+        };
+
+        parsed.discount_curve = { ...parsed.discount_curve, flat_rate: marketData.risk_free_rate };
+
+        // Update schedules dates
+        if (parsed.schedules) {
+            if (parsed.schedules.observation_dates) {
+                parsed.schedules.observation_dates = parsed.schedules.observation_dates.map(shiftDate);
+            }
+            if (parsed.schedules.payment_dates) {
+                parsed.schedules.payment_dates = parsed.schedules.payment_dates.map(shiftDate);
+            }
+        }
+
+        // Update each underlying
+        for (const underlying of parsed.underlyings || []) {
+            const data = marketData.underlyings[underlying.id];
+            if (data) {
+                underlying.spot = data.spot;
+                // Update vol term structure with historical vol and shifted dates
+                if (underlying.vol_model?.term_structure) {
+                    underlying.vol_model.term_structure = underlying.vol_model.term_structure.map((v: any) => ({
+                        date: shiftDate(v.date),
+                        vol: data.historical_vol
+                    }));
+                }
+                // Update dividend yield if continuous
+                if (underlying.dividend_model?.type === 'continuous') {
+                    underlying.dividend_model.continuous_yield = data.dividend_yield || 0;
+                }
+                // Shift discrete dividend dates
+                if (underlying.dividend_model?.discrete_dividends) {
+                    underlying.dividend_model.discrete_dividends = underlying.dividend_model.discrete_dividends.map((d: any) => ({
+                        ...d,
+                        ex_date: shiftDate(d.ex_date)
+                    }));
+                }
+            }
+        }
+
+        // Update correlations
+        if (marketData.correlations && Object.keys(marketData.correlations).length > 0) {
+            parsed.correlation = { pairwise: marketData.correlations };
+        }
+
+        setTermSheet(JSON.stringify(parsed, null, 2));
+        return parsed;
+    };
+
     const handleFetchLiveData = async () => {
         setFetchingData(true);
         setError(null);
 
         try {
             const parsed = JSON.parse(termSheet);
-
-            // Extract tickers from term sheet
-            const tickers: string[] = (parsed.underlyings || []).map((u: any) => u.id);
-            if (tickers.length === 0) {
-                throw new Error('No underlyings found in term sheet');
-            }
-
-            // Fetch live market data
-            const marketData = await fetchMarketData(tickers);
-
-            // Calculate date shift: from old valuation_date to today
-            const oldValDate = new Date(parsed.meta?.valuation_date || new Date());
-            const today = new Date();
-            const dayShift = Math.round((today.getTime() - oldValDate.getTime()) / (1000 * 60 * 60 * 24));
-
-            // Helper to shift a date string by dayShift days
-            const shiftDate = (dateStr: string): string => {
-                const d = new Date(dateStr);
-                d.setDate(d.getDate() + dayShift);
-                return d.toISOString().split('T')[0];
-            };
-
-            // Update meta dates
-            const todayStr = today.toISOString().split('T')[0];
-            parsed.meta = {
-                ...parsed.meta,
-                valuation_date: todayStr,
-                trade_date: shiftDate(parsed.meta?.trade_date || todayStr),
-                settlement_date: shiftDate(parsed.meta?.settlement_date || todayStr),
-                maturity_date: shiftDate(parsed.meta?.maturity_date || todayStr),
-                maturity_payment_date: shiftDate(parsed.meta?.maturity_payment_date || todayStr),
-            };
-
-            parsed.discount_curve = { ...parsed.discount_curve, flat_rate: marketData.risk_free_rate };
-
-            // Update schedules dates
-            if (parsed.schedules) {
-                if (parsed.schedules.observation_dates) {
-                    parsed.schedules.observation_dates = parsed.schedules.observation_dates.map(shiftDate);
-                }
-                if (parsed.schedules.payment_dates) {
-                    parsed.schedules.payment_dates = parsed.schedules.payment_dates.map(shiftDate);
-                }
-            }
-
-            // Update each underlying
-            for (const underlying of parsed.underlyings || []) {
-                const data = marketData.underlyings[underlying.id];
-                if (data) {
-                    underlying.spot = data.spot;
-                    // Update vol term structure with historical vol and shifted dates
-                    if (underlying.vol_model?.term_structure) {
-                        underlying.vol_model.term_structure = underlying.vol_model.term_structure.map((v: any) => ({
-                            date: shiftDate(v.date),
-                            vol: data.historical_vol
-                        }));
-                    }
-                    // Update dividend yield if continuous
-                    if (underlying.dividend_model?.type === 'continuous') {
-                        underlying.dividend_model.continuous_yield = data.dividend_yield || 0;
-                    }
-                    // Shift discrete dividend dates
-                    if (underlying.dividend_model?.discrete_dividends) {
-                        underlying.dividend_model.discrete_dividends = underlying.dividend_model.discrete_dividends.map((d: any) => ({
-                            ...d,
-                            ex_date: shiftDate(d.ex_date)
-                        }));
-                    }
-                }
-            }
-
-            // Update correlations
-            if (marketData.correlations && Object.keys(marketData.correlations).length > 0) {
-                parsed.correlation = { pairwise: marketData.correlations };
-            }
-
-            setTermSheet(JSON.stringify(parsed, null, 2));
+            await refreshTermSheetWithMarketData(parsed);
         } catch (err: any) {
             setError('Failed to fetch market data: ' + err.message);
         } finally {
@@ -494,16 +498,19 @@ export default function PricingPage() {
 
     const handleRunPricing = async () => {
         setLoading(true);
+        setFetchingData(true);
         setError(null);
 
         try {
             const parsed = JSON.parse(termSheet);
-            const res = await priceProduct(parsed, config);
+            const refreshed = await refreshTermSheetWithMarketData(parsed);
+            const res = await priceProduct(refreshed, config);
             setResult(res);
         } catch (err: any) {
             setError(err.message);
             setResult(null);
         } finally {
+            setFetchingData(false);
             setLoading(false);
         }
     };
