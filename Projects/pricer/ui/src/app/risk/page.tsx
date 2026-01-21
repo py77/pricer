@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { analyzeRisk, getExampleSchema, RiskResponse, RunConfig, BumpConfig } from '@/api/client';
+import { Badge, Frame, GraveCard, MetricChip, RatingBars } from '@/components/ui';
 
 const MonacoEditor = dynamic(
     () => import('@monaco-editor/react'),
@@ -29,33 +30,6 @@ function formatPercent(n: number): string {
     return (n * 100).toFixed(2) + '%';
 }
 
-// Retro Window Component
-function RetroWindow({
-    title,
-    color = 'cyan',
-    children
-}: {
-    title: string;
-    color?: 'cyan' | 'yellow' | 'pink' | 'green' | 'blue';
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="retro-window">
-            <div className={`retro-title-bar ${color}`}>
-                <div className="window-dots">
-                    <div className="window-dot red"></div>
-                    <div className="window-dot yellow"></div>
-                    <div className="window-dot green"></div>
-                </div>
-                <span className="window-title">{title}</span>
-                <div style={{ width: '44px' }}></div>
-            </div>
-            <div className="window-content">
-                {children}
-            </div>
-        </div>
-    );
-}
 
 export default function RiskPage() {
     const [termSheet, setTermSheet] = useState<string>('{}');
@@ -108,16 +82,22 @@ export default function RiskPage() {
     return (
         <div>
             <div className="page-header">
-                <h1 className="page-title">Risk Analysis</h1>
-                <p className="page-description">Calculate Greeks with Common Random Numbers (CRN)</p>
+                <div className="page-title-row">
+                    <div>
+                        <h1 className="page-title">Risk Analysis</h1>
+                        <p className="page-description">Calculate Greeks with CRN Monte Carlo</p>
+                    </div>
+                    <a className="btn" href="/">Pricing</a>
+                </div>
             </div>
 
             {/* Controls */}
-            <RetroWindow title="Controls" color="yellow">
+            <Frame title="Controls" subtitle="Run settings">
                 <div className="controls-row">
                     <div className="control-group">
-                        <label className="control-label">Paths</label>
+                        <label className="control-label" htmlFor="risk-paths">Paths</label>
                         <input
+                            id="risk-paths"
                             type="number"
                             className="control-input"
                             value={runConfig.paths}
@@ -125,8 +105,9 @@ export default function RiskPage() {
                         />
                     </div>
                     <div className="control-group">
-                        <label className="control-label">Seed</label>
+                        <label className="control-label" htmlFor="risk-seed">Seed</label>
                         <input
+                            id="risk-seed"
                             type="number"
                             className="control-input"
                             value={runConfig.seed}
@@ -134,8 +115,9 @@ export default function RiskPage() {
                         />
                     </div>
                     <div className="control-group">
-                        <label className="control-label">Block Size</label>
+                        <label className="control-label" htmlFor="risk-block">Block Size</label>
                         <input
+                            id="risk-block"
                             type="number"
                             className="control-input"
                             value={runConfig.block_size}
@@ -143,8 +125,9 @@ export default function RiskPage() {
                         />
                     </div>
                     <div className="control-group">
-                        <label className="control-label">Spot Bump</label>
+                        <label className="control-label" htmlFor="risk-spot">Spot Bump</label>
                         <input
+                            id="risk-spot"
                             type="number"
                             className="control-input"
                             step="0.001"
@@ -153,8 +136,9 @@ export default function RiskPage() {
                         />
                     </div>
                     <div className="control-group">
-                        <label className="control-label">Vol Bump</label>
+                        <label className="control-label" htmlFor="risk-vol">Vol Bump</label>
                         <input
+                            id="risk-vol"
                             type="number"
                             className="control-input"
                             step="0.001"
@@ -162,30 +146,30 @@ export default function RiskPage() {
                             onChange={e => setBumpConfig({ ...bumpConfig, vol_bump: parseFloat(e.target.value) || 0.01 })}
                         />
                     </div>
-                    <div className="control-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="checkbox-row">
                         <input
                             type="checkbox"
                             id="include-rho"
                             checked={bumpConfig.include_rho}
                             onChange={e => setBumpConfig({ ...bumpConfig, include_rho: e.target.checked })}
                         />
-                        <label htmlFor="include-rho" style={{ fontSize: '0.875rem' }}>Include Rho</label>
+                        <label htmlFor="include-rho">Include Rho</label>
                     </div>
-                    <button className="btn btn-secondary" onClick={handleLoadExample}>
+                    <button className="btn" onClick={handleLoadExample}>
                         Load Example
                     </button>
                     <button className="btn btn-primary" onClick={handleRunRisk} disabled={loading}>
                         {loading ? 'Running...' : 'Run Risk'}
                     </button>
                 </div>
-            </RetroWindow>
+            </Frame>
 
             {error && <div className="error-box" style={{ marginBottom: '1.5rem' }}>{error}</div>}
 
             <div className="editor-layout">
                 {/* Editor Panel */}
                 <div className="editor-panel">
-                    <RetroWindow title="Term Sheet (JSON)" color="cyan">
+                    <Frame title="Term Sheet (JSON)" subtitle="Paste or edit">
                         {!parsedTermSheet && (
                             <div className="error-box" style={{ marginBottom: '1rem' }}>
                                 Invalid JSON detected. Fix the JSON to run risk analysis.
@@ -208,7 +192,7 @@ export default function RiskPage() {
                                 }}
                             />
                         </div>
-                    </RetroWindow>
+                    </Frame>
                 </div>
 
                 {/* Results Panel */}
@@ -216,29 +200,27 @@ export default function RiskPage() {
                     {result ? (
                         <>
                             {/* Summary Cards */}
-                            <RetroWindow title="Summary" color="green">
-                                <div className="card-grid">
-                                    <div className="card">
-                                        <div className="stat-value">${formatNumber(result.summary.pv, 0)}</div>
-                                        <div className="stat-label">Present Value</div>
+                            <Frame title="Summary" subtitle="Risk overview">
+                                <GraveCard>
+                                    <div className="card-header">
+                                        <div className="card-title">Risk metrics</div>
+                                        <Badge>Priced</Badge>
                                     </div>
-                                    <div className="card">
-                                        <div className="stat-value">{formatPercent(result.summary.autocall_probability)}</div>
-                                        <div className="stat-label">Autocall Prob</div>
+                                    <div className="metric-grid">
+                                        <MetricChip label="Price" value={`$${formatNumber(result.summary.pv, 0)}`} />
+                                        <MetricChip label="Autocall Prob" value={formatPercent(result.summary.autocall_probability)} />
+                                        <MetricChip label="KI Probability" value={formatPercent(result.summary.ki_probability)} />
+                                        <MetricChip label="Expected Life" value={`${result.summary.expected_life_years.toFixed(2)}y`} />
                                     </div>
-                                    <div className="card">
-                                        <div className="stat-value">{formatPercent(result.summary.ki_probability)}</div>
-                                        <div className="stat-label">KI Probability</div>
+                                    <div className="results-meta">
+                                        <span>Risk posture</span>
+                                        <RatingBars value={result.summary.ki_probability * 5} color="orange" label="Risk rating" />
                                     </div>
-                                    <div className="card">
-                                        <div className="stat-value">{result.summary.expected_life_years.toFixed(2)}y</div>
-                                        <div className="stat-label">Expected Life</div>
-                                    </div>
-                                </div>
-                            </RetroWindow>
+                                </GraveCard>
+                            </Frame>
 
                             {/* Greeks Table */}
-                            <RetroWindow title="Greeks (CRN Central Diff)" color="blue">
+                            <Frame title="Greeks (CRN Central Diff)" subtitle="Sensitivity table">
                                 <div className="table-container">
                                     <table>
                                         <thead>
@@ -267,34 +249,25 @@ export default function RiskPage() {
                                         </tbody>
                                     </table>
                                 </div>
-                            </RetroWindow>
+                            </Frame>
 
                             {/* Decomposition */}
-                            <RetroWindow title="PV Decomposition" color="pink">
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                                    <div>
-                                        <div style={{ color: 'var(--success)', fontSize: '1.25rem', fontWeight: 700 }}>
-                                            ${formatNumber(result.decomposition.coupon_pv, 0)}
-                                        </div>
-                                        <div className="stat-label">Coupon PV</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ color: 'var(--primary)', fontSize: '1.25rem', fontWeight: 700 }}>
-                                            ${formatNumber(result.decomposition.autocall_redemption_pv, 0)}
-                                        </div>
-                                        <div className="stat-label">Autocall Redemption</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ color: 'var(--warning)', fontSize: '1.25rem', fontWeight: 700 }}>
-                                            ${formatNumber(result.decomposition.maturity_redemption_pv, 0)}
-                                        </div>
-                                        <div className="stat-label">Maturity Redemption</div>
-                                    </div>
+                            <Frame title="PV Decomposition" subtitle="Component breakdown">
+                                <div className="metric-grid">
+                                    <MetricChip label="Coupon PV" value={`$${formatNumber(result.decomposition.coupon_pv, 0)}`} />
+                                    <MetricChip
+                                        label="Autocall Redemption"
+                                        value={`$${formatNumber(result.decomposition.autocall_redemption_pv, 0)}`}
+                                    />
+                                    <MetricChip
+                                        label="Maturity Redemption"
+                                        value={`$${formatNumber(result.decomposition.maturity_redemption_pv, 0)}`}
+                                    />
                                 </div>
-                            </RetroWindow>
+                            </Frame>
 
                             {/* Cashflows Table */}
-                            <RetroWindow title="Expected Cashflows" color="blue">
+                            <Frame title="Expected Cashflows" subtitle="Projected payoffs">
                                 <div className="table-container">
                                     <table>
                                         <thead>
@@ -319,25 +292,29 @@ export default function RiskPage() {
                                         </tbody>
                                     </table>
                                 </div>
-                            </RetroWindow>
+                            </Frame>
 
-                            <RetroWindow title="Statistics" color="cyan">
-                                <div style={{ display: 'flex', gap: '2rem', fontSize: '13px' }}>
+                            <Frame title="Statistics" subtitle="Simulation health">
+                                <div className="results-meta">
                                     <span>Paths: {result.summary.num_paths.toLocaleString()}</span>
                                     <span>Std Error: ${formatNumber(result.summary.pv_std_error)}</span>
                                     <span>Time: {result.summary.computation_time_ms.toFixed(0)}ms</span>
                                 </div>
-                            </RetroWindow>
+                            </Frame>
                         </>
                     ) : (
-                        <RetroWindow title="Results" color="green">
-                            <div style={{ textAlign: 'center', padding: '2rem' }}>
-                                <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📊</div>
-                                <div style={{ color: 'var(--muted)' }}>
-                                    Click "Run Risk" to calculate Greeks and sensitivity analysis
+                        <Frame title="Results" subtitle="Awaiting risk run">
+                            <GraveCard>
+                                <div className="card-header">
+                                    <div className="card-title">No results yet</div>
+                                    <Badge>Waiting</Badge>
                                 </div>
-                            </div>
-                        </RetroWindow>
+                                <p className="card-description">
+                                    Click run risk to calculate Greeks and sensitivity analysis.
+                                </p>
+                                <div className="card-footer">Hover for details</div>
+                            </GraveCard>
+                        </Frame>
                     )}
                 </div>
             </div>
