@@ -329,6 +329,19 @@ export default function PricingPage() {
                         vol: data.historical_vol
                     }));
                 }
+                // Update LSV params with historical variance (vol^2)
+                if (underlying.vol_model?.type === 'local_stochastic' && underlying.vol_model?.lsv_params) {
+                    const historicalVar = data.historical_vol * data.historical_vol;
+                    underlying.vol_model.lsv_params = {
+                        ...underlying.vol_model.lsv_params,
+                        v0: historicalVar,
+                        theta: historicalVar,
+                    };
+                }
+                // Update flat vol if using flat model
+                if (underlying.vol_model?.type === 'flat') {
+                    underlying.vol_model.flat_vol = data.historical_vol;
+                }
                 // Update dividend yield if continuous
                 if (underlying.dividend_model?.type === 'continuous') {
                     underlying.dividend_model.continuous_yield = data.dividend_yield || 0;
@@ -1142,48 +1155,48 @@ export default function PricingPage() {
 
                 {/* Results Panel */}
                 <div className="results-panel">
-            {result ? (
-                <>
-                    <Frame
-                        title="Market snapshot"
-                        subtitle={marketDataDate ? `As of ${marketDataDate}` : 'Latest underlying prices used for pricing'}
-                    >
-                        {(parsedTermSheet?.underlyings || []).length ? (
-                            <div className="table-container">
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>Ticker</th>
-                                            <th style={{ textAlign: 'right' }}>Spot</th>
-                                            <th>Currency</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {(parsedTermSheet?.underlyings || []).map((underlying: any, index: number) => (
-                                            <tr key={`${underlying.id || 'underlying'}-${index}`}>
-                                                <td>{underlying.id || `Underlying ${index + 1}`}</td>
-                                                <td style={{ textAlign: 'right' }}>${formatNumber(underlying.spot ?? 0, 2)}</td>
-                                                <td>{underlying.currency ?? parsedTermSheet?.meta?.currency ?? 'USD'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <GraveCard>
-                                <div className="card-header">
-                                    <div className="card-title">No underlyings loaded</div>
-                                    <Badge>Waiting</Badge>
-                                </div>
-                                <p className="card-description">
-                                    Load a term sheet to display live underlying prices used for pricing.
-                                </p>
-                            </GraveCard>
-                        )}
-                    </Frame>
+                    {result ? (
+                        <>
+                            <Frame
+                                title="Market snapshot"
+                                subtitle={marketDataDate ? `As of ${marketDataDate}` : 'Latest underlying prices used for pricing'}
+                            >
+                                {(parsedTermSheet?.underlyings || []).length ? (
+                                    <div className="table-container">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Ticker</th>
+                                                    <th style={{ textAlign: 'right' }}>Spot</th>
+                                                    <th>Currency</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {(parsedTermSheet?.underlyings || []).map((underlying: any, index: number) => (
+                                                    <tr key={`${underlying.id || 'underlying'}-${index}`}>
+                                                        <td>{underlying.id || `Underlying ${index + 1}`}</td>
+                                                        <td style={{ textAlign: 'right' }}>${formatNumber(underlying.spot ?? 0, 2)}</td>
+                                                        <td>{underlying.currency ?? parsedTermSheet?.meta?.currency ?? 'USD'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <GraveCard>
+                                        <div className="card-header">
+                                            <div className="card-title">No underlyings loaded</div>
+                                            <Badge>Waiting</Badge>
+                                        </div>
+                                        <p className="card-description">
+                                            Load a term sheet to display live underlying prices used for pricing.
+                                        </p>
+                                    </GraveCard>
+                                )}
+                            </Frame>
 
-                    {/* Summary Cards */}
-                    <Frame title="Summary" subtitle="Key pricing metrics">
+                            {/* Summary Cards */}
+                            <Frame title="Summary" subtitle="Key pricing metrics">
                                 <GraveCard>
                                     <div className="card-header">
                                         <div className="card-title">Pricing output</div>
