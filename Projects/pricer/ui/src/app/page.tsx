@@ -203,6 +203,7 @@ export default function PricingPage() {
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [fetchingData, setFetchingData] = useState(false);
+    const [marketDataDate, setMarketDataDate] = useState<string | null>(null);
     const [showJson, setShowJson] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
@@ -236,9 +237,28 @@ export default function PricingPage() {
 
     // Load example on mount
     useEffect(() => {
-        getExampleSchema()
-            .then(schema => setTermSheet(JSON.stringify(schema, null, 2)))
-            .catch(err => setError('Failed to load example: ' + err.message));
+        let isMounted = true;
+        const loadExample = async () => {
+            setFetchingData(true);
+            setError(null);
+            try {
+                const schema = await getExampleSchema();
+                await refreshTermSheetWithMarketData(schema);
+            } catch (err: any) {
+                if (isMounted) {
+                    setError('Failed to load example: ' + err.message);
+                }
+            } finally {
+                if (isMounted) {
+                    setFetchingData(false);
+                }
+            }
+        };
+
+        loadExample();
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     const handleLoadExample = async () => {
@@ -260,6 +280,7 @@ export default function PricingPage() {
 
         // Fetch live market data
         const marketData = await fetchMarketData(tickers);
+        setMarketDataDate(marketData.as_of_date);
 
         // Calculate date shift: from old valuation_date to today
         const oldValDate = new Date(parsed.meta?.valuation_date || new Date());
@@ -1121,10 +1142,48 @@ export default function PricingPage() {
 
                 {/* Results Panel */}
                 <div className="results-panel">
-                    {result ? (
-                        <>
-                            {/* Summary Cards */}
-                            <Frame title="Summary" subtitle="Key pricing metrics">
+            {result ? (
+                <>
+                    <Frame
+                        title="Market snapshot"
+                        subtitle={marketDataDate ? `As of ${marketDataDate}` : 'Latest underlying prices used for pricing'}
+                    >
+                        {(parsedTermSheet?.underlyings || []).length ? (
+                            <div className="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Ticker</th>
+                                            <th style={{ textAlign: 'right' }}>Spot</th>
+                                            <th>Currency</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(parsedTermSheet?.underlyings || []).map((underlying: any, index: number) => (
+                                            <tr key={`${underlying.id || 'underlying'}-${index}`}>
+                                                <td>{underlying.id || `Underlying ${index + 1}`}</td>
+                                                <td style={{ textAlign: 'right' }}>${formatNumber(underlying.spot ?? 0, 2)}</td>
+                                                <td>{underlying.currency ?? parsedTermSheet?.meta?.currency ?? 'USD'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <GraveCard>
+                                <div className="card-header">
+                                    <div className="card-title">No underlyings loaded</div>
+                                    <Badge>Waiting</Badge>
+                                </div>
+                                <p className="card-description">
+                                    Load a term sheet to display live underlying prices used for pricing.
+                                </p>
+                            </GraveCard>
+                        )}
+                    </Frame>
+
+                    {/* Summary Cards */}
+                    <Frame title="Summary" subtitle="Key pricing metrics">
                                 <GraveCard>
                                     <div className="card-header">
                                         <div className="card-title">Pricing output</div>
