@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { priceProduct, getExampleSchema, fetchMarketData, PriceResponse, RunConfig } from '@/api/client';
 import { Badge, Frame, GraveCard, MetricChip, PillButton, RatingBars, SearchBar, Tooltip, FormField } from '@/components/ui';
@@ -557,7 +557,7 @@ export default function PricingPage() {
         });
     };
 
-    const handleRunPricing = async () => {
+    const handleRunPricing = useCallback(async () => {
         setLoading(true);
         setFetchingData(true);
         setError(null);
@@ -574,14 +574,14 @@ export default function PricingPage() {
             setFetchingData(false);
             setLoading(false);
         }
-    };
+    }, [termSheet, config]);
 
-    const handleSelectInstrument = (instrumentId: string) => {
+    const handleSelectInstrument = useCallback((instrumentId: string) => {
         setSelectedInstrumentId(instrumentId);
         requestAnimationFrame(() => {
             pricerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
-    };
+    }, []);
 
     const selectedInstrument = INSTRUMENTS.find((instrument) => instrument.id === selectedInstrumentId);
     const protectionInputs = PROTECTION_INPUTS_BY_INSTRUMENT[selectedInstrumentId]
