@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { priceProduct, getExampleSchema, fetchMarketData, PriceResponse, RunConfig } from '@/api/client';
-import { Badge, Frame, GraveCard, MetricChip, PillButton, RatingBars, SearchBar } from '@/components/ui';
+import { Badge, Frame, GraveCard, MetricChip, PillButton, RatingBars, SearchBar, Tooltip, FormField } from '@/components/ui';
 
 // Dynamic import Monaco to avoid SSR issues
 const MonacoEditor = dynamic(
@@ -209,6 +209,9 @@ export default function PricingPage() {
     const [activeCategory, setActiveCategory] = useState('All');
     const [selectedInstrumentId, setSelectedInstrumentId] = useState('autocallable');
     const pricerRef = useRef<HTMLDivElement>(null);
+
+    // Validation state
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
     const parsedTermSheet = useMemo(() => {
         try {
@@ -434,7 +437,30 @@ export default function PricingPage() {
         draft.correlation = { ...draft.correlation, pairwise: nextPairs };
     };
 
+    const validateField = (field: string, value: any): string | undefined => {
+        switch (field) {
+            case 'notional':
+                if (!value || value <= 0) return 'Notional must be greater than 0';
+                if (value > 1000000000) return 'Notional seems unusually large';
+                break;
+            case 'currency':
+                if (!value || value.length !== 3) return 'Currency must be 3 letters (e.g., USD)';
+                break;
+            case 'product_id':
+                if (!value || value.trim().length === 0) return 'Product ID is required';
+                break;
+        }
+        return undefined;
+    };
+
     const handleMetaChange = (field: string, value: string | number) => {
+        // Validate
+        const error = validateField(field, value);
+        setValidationErrors(prev => ({
+            ...prev,
+            [field]: error || ''
+        }));
+
         updateTermSheet(draft => {
             draft.meta = { ...draft.meta, [field]: value };
         });
@@ -703,36 +729,56 @@ export default function PricingPage() {
                         <div className="term-sheet-section">
                             <div className="term-sheet-section-title">Product Overview</div>
                             <div className="term-sheet-grid">
-                                <div className="form-group">
-                                    <label className="form-label">Product ID</label>
+                                <FormField
+                                    label="Product ID"
+                                    tooltip="Unique identifier for this structured product"
+                                    error={validationErrors.product_id}
+                                    required
+                                    htmlFor="product-id-input"
+                                >
                                     <input
+                                        id="product-id-input"
                                         className="form-input"
                                         type="text"
                                         value={parsedTermSheet?.meta?.product_id ?? ''}
                                         onChange={(e) => handleMetaChange('product_id', e.target.value)}
                                         disabled={!parsedTermSheet}
                                     />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Currency</label>
+                                </FormField>
+                                <FormField
+                                    label="Currency"
+                                    tooltip="Settlement currency (3-letter ISO code)"
+                                    error={validationErrors.currency}
+                                    required
+                                    htmlFor="currency-input"
+                                >
                                     <input
+                                        id="currency-input"
                                         className="form-input"
                                         type="text"
                                         value={parsedTermSheet?.meta?.currency ?? ''}
-                                        onChange={(e) => handleMetaChange('currency', e.target.value)}
+                                        onChange={(e) => handleMetaChange('currency', e.target.value.toUpperCase())}
                                         disabled={!parsedTermSheet}
+                                        maxLength={3}
                                     />
-                                </div>
-                                <div className="form-group">
-                                    <label className="form-label">Notional</label>
+                                </FormField>
+                                <FormField
+                                    label="Notional"
+                                    tooltip="Total investment amount in the specified currency"
+                                    error={validationErrors.notional}
+                                    success={!validationErrors.notional && parsedTermSheet?.meta?.notional > 0}
+                                    required
+                                    htmlFor="notional-input"
+                                >
                                     <input
+                                        id="notional-input"
                                         className="form-input"
                                         type="number"
                                         value={parsedTermSheet?.meta?.notional ?? ''}
                                         onChange={(e) => handleMetaChange('notional', parseNumber(e.target.value, 0))}
                                         disabled={!parsedTermSheet}
                                     />
-                                </div>
+                                </FormField>
                             </div>
                         </div>
 
