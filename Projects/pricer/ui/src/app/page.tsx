@@ -402,7 +402,7 @@ export default function PricingPage() {
         const currency = draft?.meta?.currency ?? 'USD';
         return {
             id: '',
-            spot: base.spot ?? 0,
+            spot: 100, // Default spot, will be updated when market data is fetched
             currency: base.currency ?? currency,
             dividend_model: base.dividend_model
                 ? {
