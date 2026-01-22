@@ -526,6 +526,42 @@ export default function PricingPage() {
         }
     };
 
+    const handleRefreshUnderlying = useCallback(async (index: number) => {
+        const underlying = parsedTermSheet?.underlyings?.[index];
+        if (!underlying?.id) return;
+
+        setFetchingData(true);
+        try {
+            const spots = await fetchMarketData([underlying.id]);
+            if (spots.underlyings[underlying.id]) {
+                const marketData = spots.underlyings[underlying.id];
+                updateTermSheet(draft => {
+                    const underlyings = [...(draft.underlyings || [])];
+                    if (underlyings[index]) {
+                        underlyings[index] = {
+                            ...underlyings[index],
+                            spot: marketData.spot,
+                        };
+                        // Update vol if using LSV
+                        if (underlyings[index].vol_model?.type === 'local_stochastic') {
+                            const historicalVar = marketData.historical_vol * marketData.historical_vol;
+                            underlyings[index].vol_model.lsv_params = {
+                                ...underlyings[index].vol_model.lsv_params,
+                                v0: historicalVar,
+                                theta: historicalVar,
+                            };
+                        }
+                        draft.underlyings = underlyings;
+                    }
+                });
+            }
+        } catch (err: any) {
+            setError(`Failed to fetch data for ${underlying.id}: ${err.message}`);
+        } finally {
+            setFetchingData(false);
+        }
+    }, [parsedTermSheet]);
+
     const handleDividendTypeChange = (index: number, value: string) => {
         updateTermSheet(draft => {
             const underlyings = [...(draft.underlyings || [])];
@@ -912,13 +948,25 @@ export default function PricingPage() {
                                             </div>
                                             <div className="form-group">
                                                 <label className="form-label">Spot</label>
-                                                <input
-                                                    className="form-input"
-                                                    type="number"
-                                                    value={underlying.spot ?? ''}
-                                                    onChange={(e) => handleUnderlyingChange(index, 'spot', parseNumber(e.target.value, 0))}
-                                                    disabled={!parsedTermSheet}
-                                                />
+                                                <div className="controls-row">
+                                                    <input
+                                                        className="form-input"
+                                                        type="number"
+                                                        value={underlying.spot ?? ''}
+                                                        onChange={(e) => handleUnderlyingChange(index, 'spot', parseNumber(e.target.value, 0))}
+                                                        disabled={!parsedTermSheet}
+                                                        style={{ flex: 1 }}
+                                                    />
+                                                    <button
+                                                        className="btn btn-secondary"
+                                                        onClick={() => handleRefreshUnderlying(index)}
+                                                        disabled={!underlying.id || fetchingData}
+                                                        title="Fetch live spot price"
+                                                        style={{ padding: '0.5rem 0.8rem' }}
+                                                    >
+                                                        ↻
+                                                    </button>
+                                                </div>
                                             </div>
                                             <div className="form-group">
                                                 <label className="form-label">Dividend Type</label>
