@@ -1,0 +1,60 @@
+name: API Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'api/**'
+      - 'backend/**'
+      - '.github/workflows/api-test.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'api/**'
+      - 'backend/**'
+
+jobs:
+  api-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./backend
+          pip install -e ./api
+          pip install httpx pytest-asyncio
+      
+      - name: Start API server
+        run: |
+          cd api
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+      
+      - name: Test API health endpoint
+        run: |
+          curl -f http://localhost:8000/health || exit 1
+      
+      - name: Test API docs endpoint
+        run: |
+          curl -f http://localhost:8000/docs || exit 1
+      
+      - name: Run API integration tests
+        run: |
+          cd api
+          pytest tests/ -v
+        if: always()
+      
+      - name: Stop API server
+        run: |
+          pkill -f uvicorn
+        if: always()

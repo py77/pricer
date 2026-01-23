@@ -1,107 +1,123 @@
 # Structured Products Pricer
 
-Production-grade pricer for Autocallable structured products with web UI.
+Production-grade pricer for Autocallable structured products with Monte Carlo simulation, Brownian bridge barrier monitoring, and comprehensive Greeks calculation.
 
-## Project Structure
+## ✨ Features
 
-```
-pricer/
-├── backend/          # Python pricer library (Monte Carlo, Greeks)
-│   ├── src/pricer/   # Core pricing modules
-│   ├── tests/        # Test suite
-│   └── examples/     # CLI examples
-├── api/              # FastAPI wrapper
-│   └── main.py       # REST API endpoints
-├── ui/               # Next.js web interface
-│   └── src/          # React components
-└── docker-compose.yml
-```
+- **Multi-Asset Pricing**: Worst-of autocalls with correlated underlyings
+- **Advanced Barriers**: Continuous knock-in monitoring via Brownian bridge
+- **Comprehensive Greeks**: Delta, Vega, Rho with Common Random Numbers
+- **Flexible Vol Models**: Flat, piecewise constant, and local stochastic volatility
+- **Production Ready**: Type-safe, tested, and optimized for performance
 
-## Quick Start
+## 🚀 Quick Start
 
-### Option 1: Manual Setup
+### Prerequisites
+
+- Python 3.11+
+- Node.js 18+ (for UI)
+
+### Installation
 
 ```bash
 # 1. Install backend
 pip install -e ./backend
 
 # 2. Install API dependencies
-pip install fastapi uvicorn[standard]
+pip install -e ./api
 
-# 3. Start API server
+# 3. Install UI dependencies
+cd ui && npm install
+```
+
+### Running Locally
+
+```bash
+# Terminal 1: Start API server
 cd api
 uvicorn main:app --reload --port 8000
 
-# 4. In another terminal, start UI
+# Terminal 2: Start UI
 cd ui
-npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+Then open:
+- **UI**: http://localhost:3000
+- **API Docs**: http://localhost:8000/docs
 
-### Option 2: Docker Compose
+### Using Docker Compose
 
 ```bash
 docker-compose up
 ```
 
-- API: http://localhost:8000
-- UI: http://localhost:3000
-- API Docs: http://localhost:8000/docs
+## 📚 Documentation
 
-## Features
+- **[Development Setup](docs/development/setup.md)** - Detailed installation and configuration
+- **[Architecture Overview](docs/architecture/overview.md)** - System design and components
+- **[API Documentation](docs/api/endpoints.md)** - Endpoint reference
+- **[All Documentation](docs/README.md)** - Complete documentation index
 
-### Backend
-- Multi-asset GBM with Cholesky correlation
-- Brownian bridge continuous KI monitoring
-- Coupon memory, autocall with stepping barriers
-- Discrete and continuous dividends
+## 🧪 Testing
 
-### Risk
-- Delta (1% spot bump)
-- Vega (1 vol point bump)
-- Rho (1bp rate bump)
-- Common Random Numbers for stable Greeks
+```bash
+cd backend
+pytest tests/ -v --cov=pricer
+```
 
-### UI
-- Monaco JSON editor for term sheets
-- Configurable paths, seed, bump sizes
-- Summary cards, cashflow tables
-- PV decomposition chart
-- Greeks table
+## 📦 Project Structure
 
-## API Endpoints
+```
+pricer/
+├── backend/          # Python pricing library
+│   ├── src/pricer/   # Core modules (engines, pricers, risk)
+│   ├── tests/        # Test suite
+│   └── examples/     # CLI examples
+├── api/              # FastAPI REST API
+│   └── main.py       # API endpoints
+├── ui/               # Next.js web interface
+│   └── src/          # React components
+└── docs/             # Documentation
+```
+
+## 🔧 Development
+
+```bash
+# Run tests
+make test
+
+# Type checking
+make lint
+
+# Format code
+make format
+```
+
+See [Development Setup](docs/development/setup.md) for detailed instructions.
+
+## 📖 API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check |
-| GET | `/schema` | Get example term sheet |
+| GET | `/schema` | Example term sheet |
 | POST | `/price` | Price a product |
 | POST | `/risk` | Risk analysis with Greeks |
+| POST | `/vanilla/price` | Price vanilla options |
+| GET | `/market-data` | Fetch market data |
 
-## Testing
+## 🌐 Deployment
 
-```bash
-cd backend
-python -m pytest tests/ -v
-```
+- **API**: Deploy to Render using `render.yaml`
+- **UI**: Deploy to Vercel (auto-detected)
+- **Production**: https://pricer-six.vercel.app
 
-## Commands Reference
+## 📄 License
 
-```bash
-# Install backend
-pip install -e ./backend
+MIT
 
-# Run API
-cd api && uvicorn main:app --reload --port 8000
+## 🤝 Contributing
 
-# Run UI
-cd ui && npm run dev
+Contributions welcome! Please see [Development Setup](docs/development/setup.md) for getting started.
 
-# Run tests
-cd backend && python -m pytest tests/ -v
-
-# Generate TypeScript types
-cd ui && npm run generate-types
-```

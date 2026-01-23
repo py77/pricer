@@ -39,6 +39,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+pricer = ["py.typed"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true

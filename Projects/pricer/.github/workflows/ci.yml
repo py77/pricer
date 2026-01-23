@@ -1,0 +1,63 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ./backend[dev]
+      
+      - name: Run ruff linting
+        run: |
+          cd backend
+          ruff check src/ tests/
+      
+      - name: Run ruff formatting check
+        run: |
+          cd backend
+          ruff format --check src/ tests/
+      
+      - name: Run mypy type checking
+        run: |
+          cd backend
+          mypy src/pricer
+        continue-on-error: true  # Don't fail build on type errors initially
+      
+      - name: Run tests with coverage
+        run: |
+          cd backend
+          pytest tests/ -v --cov=pricer --cov-report=xml --cov-report=term-missing
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./backend/coverage.xml
+          flags: backend
+          name: backend-${{ matrix.python-version }}
+        if: matrix.python-version == '3.11'
