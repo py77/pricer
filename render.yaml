@@ -5,12 +5,11 @@ services:
     region: oregon
     plan: free
     buildCommand: |
-      cd Projects/pricer
       pip install -r requirements.txt
       pip install -e ./backend
-    startCommand: cd Projects/pricer && uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: PYTHONPATH
-        value: /opt/render/project/src/Projects/pricer/backend/src
+        value: /opt/render/project/src/backend/src
