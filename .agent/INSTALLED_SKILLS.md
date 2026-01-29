@@ -134,13 +134,5 @@ You can also explicitly request a skill by mentioning it, for example:
 
 ## 📍 Installation Location
 
-All skills are installed in:
-```
-c:\Users\longr\Projects\pricer\.agent\skills\
-├── anthropics-skills/
-├── obra-superpowers/
-├── softaworks-agent-toolkit/
-└── vercel-labs-agent-skills/
-```
-
-Each skill contains a `SKILL.md` file with detailed instructions and best practices.
+Skills are installed outside this repository. Refer to your local agent configuration for
+the active skills directory.
