@@ -1,0 +1,194 @@
+{
+    "meta": {
+        "product_id": "AC-WOF-2024-001",
+        "trade_date": "2024-01-12",
+        "valuation_date": "2024-01-15",
+        "settlement_date": "2024-01-17",
+        "maturity_date": "2027-01-15",
+        "maturity_payment_date": "2027-01-19",
+        "currency": "USD",
+        "notional": 1000000
+    },
+    "underlyings": [
+        {
+            "id": "AAPL",
+            "spot": 185.0,
+            "currency": "USD",
+            "dividend_model": {
+                "type": "continuous",
+                "continuous_yield": 0.005
+            },
+            "vol_model": {
+                "type": "local_stochastic",
+                "lsv_params": {
+                    "v0": 0.0784,
+                    "theta": 0.0576,
+                    "kappa": 2.0,
+                    "xi": 0.3,
+                    "rho": -0.7
+                }
+            }
+        },
+        {
+            "id": "GOOG",
+            "spot": 140.0,
+            "currency": "USD",
+            "dividend_model": {
+                "type": "continuous",
+                "continuous_yield": 0.0
+            },
+            "vol_model": {
+                "type": "local_stochastic",
+                "lsv_params": {
+                    "v0": 0.1024,
+                    "theta": 0.0784,
+                    "kappa": 1.8,
+                    "xi": 0.35,
+                    "rho": -0.65
+                }
+            }
+        },
+        {
+            "id": "MSFT",
+            "spot": 390.0,
+            "currency": "USD",
+            "dividend_model": {
+                "type": "discrete",
+                "discrete_dividends": [
+                    {
+                        "ex_date": "2024-02-15",
+                        "amount": 0.75
+                    },
+                    {
+                        "ex_date": "2024-05-16",
+                        "amount": 0.75
+                    },
+                    {
+                        "ex_date": "2024-08-15",
+                        "amount": 0.75
+                    },
+                    {
+                        "ex_date": "2024-11-21",
+                        "amount": 0.75
+                    },
+                    {
+                        "ex_date": "2025-02-20",
+                        "amount": 0.80
+                    },
+                    {
+                        "ex_date": "2025-05-15",
+                        "amount": 0.80
+                    },
+                    {
+                        "ex_date": "2025-08-21",
+                        "amount": 0.80
+                    },
+                    {
+                        "ex_date": "2025-11-20",
+                        "amount": 0.80
+                    },
+                    {
+                        "ex_date": "2026-02-19",
+                        "amount": 0.85
+                    },
+                    {
+                        "ex_date": "2026-05-21",
+                        "amount": 0.85
+                    },
+                    {
+                        "ex_date": "2026-08-20",
+                        "amount": 0.85
+                    },
+                    {
+                        "ex_date": "2026-11-19",
+                        "amount": 0.85
+                    }
+                ]
+            },
+            "vol_model": {
+                "type": "local_stochastic",
+                "lsv_params": {
+                    "v0": 0.0625,
+                    "theta": 0.0529,
+                    "kappa": 2.2,
+                    "xi": 0.28,
+                    "rho": -0.75
+                }
+            }
+        }
+    ],
+    "conventions": {
+        "calendar": "WE",
+        "business_day_rule": "modified_following",
+        "coupon_day_count": "ACT/360",
+        "discount_day_count": "ACT/365F"
+    },
+    "discount_curve": {
+        "type": "flat",
+        "flat_rate": 0.05,
+        "day_count": "ACT/365F"
+    },
+    "correlation": {
+        "pairwise": {
+            "AAPL_GOOG": 0.65,
+            "AAPL_MSFT": 0.70,
+            "GOOG_MSFT": 0.60
+        }
+    },
+    "schedules": {
+        "observation_dates": [
+            "2024-07-15",
+            "2025-01-15",
+            "2025-07-15",
+            "2026-01-15",
+            "2026-07-15",
+            "2027-01-15"
+        ],
+        "payment_dates": [
+            "2024-07-17",
+            "2025-01-17",
+            "2025-07-17",
+            "2026-01-19",
+            "2026-07-17",
+            "2027-01-19"
+        ],
+        "autocall_levels": [
+            1.0,
+            1.0,
+            0.95,
+            0.95,
+            0.90,
+            0.85
+        ],
+        "coupon_barriers": [
+            0.70,
+            0.70,
+            0.70,
+            0.70,
+            0.70,
+            0.70
+        ],
+        "coupon_rates": [
+            0.04,
+            0.04,
+            0.04,
+            0.04,
+            0.04,
+            0.04
+        ]
+    },
+    "ki_barrier": {
+        "level": 0.60,
+        "monitoring": "continuous"
+    },
+    "payoff": {
+        "worst_of": true,
+        "coupon_memory": true,
+        "settlement": "cash",
+        "coupon_on_autocall": true,
+        "redemption_if_autocall": 1.0,
+        "redemption_if_no_ki": 1.0,
+        "redemption_if_ki": "worst_performance",
+        "ki_redemption_floor": 0.0
+    }
+}

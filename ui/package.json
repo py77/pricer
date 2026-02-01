@@ -1,0 +1,35 @@
+{
+    "name": "pricer-ui",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint",
+        "generate-types": "npx openapi-typescript http://localhost:8000/openapi.json -o src/api/generated/schema.ts"
+    },
+    "dependencies": {
+        "@monaco-editor/react": "^4.6.0",
+        "@radix-ui/react-slot": "^1.2.4",
+        "class-variance-authority": "^0.7.1",
+        "clsx": "^2.1.1",
+        "lucide-react": "^0.563.0",
+        "next": "14.1.0",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "recharts": "^2.12.0",
+        "tailwind-merge": "^3.4.0",
+        "tailwindcss-animate": "^1.0.7"
+    },
+    "devDependencies": {
+        "@types/node": "^20.11.0",
+        "@types/react": "^18.2.0",
+        "@types/react-dom": "^18.2.0",
+        "autoprefixer": "^10.4.24",
+        "openapi-typescript": "^6.7.0",
+        "postcss": "^8.5.6",
+        "tailwindcss": "^4.1.18",
+        "typescript": "^5.3.0"
+    }
+}

@@ -1,0 +1,130 @@
+{
+    "product_type": "autocallable",
+    "product_id": "AC-WOF-2024-001",
+    "underlyings": [
+        "AAPL",
+        "GOOG",
+        "MSFT"
+    ],
+    "notional": 1000000,
+    "currency": "USD",
+    "trade_date": "2024-01-15",
+    "settlement_date": "2024-01-17",
+    "maturity_date": "2027-01-15",
+    "worst_of": true,
+    "settlement_type": "cash",
+    "autocall_schedule": [
+        {
+            "date": "2024-07-15",
+            "autocall_level": 1.0,
+            "redemption_amount": 1.0
+        },
+        {
+            "date": "2025-01-15",
+            "autocall_level": 1.0,
+            "redemption_amount": 1.0
+        },
+        {
+            "date": "2025-07-15",
+            "autocall_level": 0.95,
+            "redemption_amount": 1.0
+        },
+        {
+            "date": "2026-01-15",
+            "autocall_level": 0.95,
+            "redemption_amount": 1.0
+        },
+        {
+            "date": "2026-07-15",
+            "autocall_level": 0.90,
+            "redemption_amount": 1.0
+        },
+        {
+            "date": "2027-01-15",
+            "autocall_level": 0.85,
+            "redemption_amount": 1.0
+        }
+    ],
+    "coupon_schedule": [
+        {
+            "observation_date": "2024-04-15",
+            "payment_date": "2024-04-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2024-07-15",
+            "payment_date": "2024-07-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2024-10-15",
+            "payment_date": "2024-10-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2025-01-15",
+            "payment_date": "2025-01-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2025-04-15",
+            "payment_date": "2025-04-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2025-07-15",
+            "payment_date": "2025-07-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2025-10-15",
+            "payment_date": "2025-10-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2026-01-15",
+            "payment_date": "2026-01-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2026-04-15",
+            "payment_date": "2026-04-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2026-07-15",
+            "payment_date": "2026-07-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2026-10-15",
+            "payment_date": "2026-10-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        },
+        {
+            "observation_date": "2027-01-15",
+            "payment_date": "2027-01-17",
+            "coupon_barrier": 0.70,
+            "coupon_rate": 0.02
+        }
+    ],
+    "coupon_memory": true,
+    "ki_barrier": {
+        "level": 0.60,
+        "type": "american",
+        "direction": "down"
+    },
+    "final_redemption": 1.0,
+    "protection_level": 0.0
+}
