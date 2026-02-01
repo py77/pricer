@@ -377,9 +377,15 @@ export default function PricingPage() {
                 if (underlying.vol_model?.type === 'flat') {
                     underlying.vol_model.flat_vol = data.historical_vol;
                 }
-                // Update dividend yield if continuous (cap at 0.5 to pass schema validation)
+                // Update dividend yield if continuous
+                // yfinance returns inconsistent values: 0.4 could mean 0.4% or 40%
+                // Normalize: if > 0.15, treat as percentage and divide by 100
                 if (underlying.dividend_model?.type === 'continuous') {
-                    underlying.dividend_model.continuous_yield = Math.min(data.dividend_yield || 0, 0.5);
+                    let divYield = data.dividend_yield || 0;
+                    if (divYield > 0.15) {
+                        divYield = divYield / 100; // Convert from percentage
+                    }
+                    underlying.dividend_model.continuous_yield = Math.min(divYield, 0.10); // Cap at 10%
                 }
                 // Shift discrete dividend dates
                 if (underlying.dividend_model?.discrete_dividends) {
