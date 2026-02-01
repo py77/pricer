@@ -12,4 +12,4 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: PYTHONPATH
-        value: /opt/render/project/src/backend/src
+        value: /opt/render/project/src:/opt/render/project/src/backend/src
