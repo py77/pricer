@@ -78,5 +78,33 @@ export const viewport: Viewport = {
 ## Tech Stack
 
 - **Frontend**: Next.js 14.2.x, React 18, TailwindCSS, shadcn/ui
-- **Backend**: Python, FastAPI
-- **Deployment**: Vercel (frontend), GitHub
+- **Backend**: Python, FastAPI (deployed on Render)
+- **Deployment**: Vercel (frontend at https://pricer-six.vercel.app), Render (backend API)
+
+## UI Theme
+
+The UI uses a **minimalist dark theme** with:
+- Dark slate/charcoal background (#0c0d10)
+- Teal accent color (#2dd4bf)
+- DM Sans font from Google Fonts
+- Clean, solid colors (no gradients or glow effects)
+
+## Backend API
+
+- **Production URL**: https://pricer-api-o6kd.onrender.com
+- **Health check**: GET /health
+- **Example schema**: GET /schema
+- **Pricing**: POST /price
+- **Market data**: GET /market-data?tickers=AAPL,GOOG
+
+### CORS Configuration
+The backend allows origins:
+- http://localhost:3000
+- http://localhost:3001
+- https://pricer-six.vercel.app
+- https://*.vercel.app
+
+If adding new frontend URLs, update CORS in `api/main.py` and redeploy to Render.
+
+### Cold Start
+Render free tier may take ~30s to wake up. The frontend has retry logic with exponential backoff for this.

@@ -339,7 +339,27 @@ def fetch_market_data_snapshot(
         # Calculate dividend yield
         try:
             stock = yf.Ticker(ticker)
-            div_yield = stock.info.get("dividendYield", 0) or 0
+            raw_div_yield = stock.info.get("dividendYield", 0) or 0
+            
+            # yfinance dividendYield is inconsistent:
+            # - Sometimes returns as decimal (0.0044 for 0.44%)
+            # - Sometimes returns as percentage-like (0.44 for 0.44%)
+            # Validate and normalize:
+            # - If > 0.15, it's likely already a ratio (15%+), which is unrealistic for most stocks
+            # - If > 1.0, it's definitely wrong (100%+ yield)
+            # - Cap at 10% (0.10) as a sanity check
+            if raw_div_yield > 1.0:
+                # Clearly a percentage value (e.g., 40 for 40%), convert
+                div_yield = raw_div_yield / 100
+            elif raw_div_yield > 0.15:
+                # Suspiciously high, likely already percentage expressed as decimal
+                # Most stocks have < 5% yield, so > 15% is very rare
+                div_yield = raw_div_yield / 100
+            else:
+                div_yield = raw_div_yield
+            
+            # Safety cap at 10% - anything higher is likely an error
+            div_yield = min(div_yield, 0.10)
         except:
             div_yield = 0
         
