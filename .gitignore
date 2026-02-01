@@ -60,3 +60,6 @@ Desktop.ini
 # Antigravity/Gemini
 .gemini/
 .antigravity/
+
+# agent skills (vendored repos)
+.agent/skills/

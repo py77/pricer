@@ -29,11 +29,11 @@
 
 Establish proper project documentation structure and improve code organization.
 
-#### [NEW] [docs/README.md](file:///c:/Users/longr/pricer/docs/README.md)
+#### [NEW] [docs/README.md](file:///c:/Users/longr/Projects/pricer/docs/README.md)
 
 Create documentation index with links to architecture, API docs, and development guides.
 
-#### [NEW] [docs/architecture/overview.md](file:///c:/Users/longr/pricer/docs/architecture/overview.md)
+#### [NEW] [docs/architecture/overview.md](file:///c:/Users/longr/Projects/pricer/docs/architecture/overview.md)
 
 Document the overall system architecture including:
 - Component diagram (backend, API, UI)
@@ -41,7 +41,7 @@ Document the overall system architecture including:
 - Monte Carlo simulation architecture
 - Brownian bridge implementation details
 
-#### [NEW] [docs/development/setup.md](file:///c:/Users/longr/pricer/docs/development/setup.md)
+#### [NEW] [docs/development/setup.md](file:///c:/Users/longr/Projects/pricer/docs/development/setup.md)
 
 Comprehensive development setup guide covering:
 - Environment setup (Python, Node.js)
@@ -49,7 +49,7 @@ Comprehensive development setup guide covering:
 - Running tests
 - Local development workflow
 
-#### [MODIFY] [README.md](file:///c:/Users/longr/pricer/README.md)
+#### [MODIFY] [README.md](file:///c:/Users/longr/Projects/pricer/README.md)
 
 Simplify root README to essential quick-start info and link to detailed docs.
 
@@ -59,7 +59,7 @@ Simplify root README to essential quick-start info and link to detailed docs.
 
 Improve code organization and strengthen type safety across the codebase.
 
-#### [MODIFY] [backend/src/pricer/__init__.py](file:///c:/Users/longr/pricer/backend/src/pricer/__init__.py)
+#### [MODIFY] [backend/src/pricer/__init__.py](file:///c:/Users/longr/Projects/pricer/backend/src/pricer/__init__.py)
 
 Add comprehensive module-level exports with type hints for better IDE support:
 ```python
@@ -80,11 +80,11 @@ __all__ = [
 ]
 ```
 
-#### [NEW] [backend/py.typed](file:///c:/Users/longr/pricer/backend/py.typed)
+#### [NEW] [backend/py.typed](file:///c:/Users/longr/Projects/pricer/backend/py.typed)
 
 Add PEP 561 marker file to indicate the package supports type checking.
 
-#### [MODIFY] [backend/pyproject.toml](file:///c:/Users/longr/pricer/backend/pyproject.toml)
+#### [MODIFY] [backend/pyproject.toml](file:///c:/Users/longr/Projects/pricer/backend/pyproject.toml)
 
 Add package data configuration to include py.typed:
 ```toml
@@ -98,7 +98,7 @@ pricer = ["py.typed"]
 
 Enhance testing infrastructure with better coverage, fixtures, and test organization.
 
-#### [NEW] [backend/tests/conftest.py](file:///c:/Users/longr/pricer/backend/tests/conftest.py)
+#### [NEW] [backend/tests/conftest.py](file:///c:/Users/longr/Projects/pricer/backend/tests/conftest.py)
 
 Create shared pytest fixtures for common test data:
 ```python
@@ -130,7 +130,7 @@ def pricing_config():
     pass
 ```
 
-#### [NEW] [backend/tests/unit/](file:///c:/Users/longr/pricer/backend/tests/unit/)
+#### [NEW] [backend/tests/unit/](file:///c:/Users/longr/Projects/pricer/backend/tests/unit/)
 
 Create unit test directory structure:
 - `test_schema_validation.py` - Schema validation edge cases
@@ -138,7 +138,7 @@ Create unit test directory structure:
 - `test_calendar.py` - Calendar business day tests
 - `test_correlation.py` - Correlation matrix validation
 
-#### [NEW] [backend/tests/integration/](file:///c:/Users/longr/pricer/backend/tests/integration/)
+#### [NEW] [backend/tests/integration/](file:///c:/Users/longr/Projects/pricer/backend/tests/integration/)
 
 Create integration test directory:
 - `test_pricing_workflow.py` - End-to-end pricing tests
@@ -159,7 +159,7 @@ Move existing tests to appropriate directories:
 
 Refactor API for better maintainability and add proper error handling.
 
-#### [NEW] [api/routers/](file:///c:/Users/longr/pricer/api/routers/)
+#### [NEW] [api/routers/](file:///c:/Users/longr/Projects/pricer/api/routers/)
 
 Split monolithic `main.py` into router modules:
 - `health.py` - Health check endpoint
@@ -168,21 +168,21 @@ Split monolithic `main.py` into router modules:
 - `vanilla.py` - Vanilla option endpoints
 - `market_data.py` - Market data endpoints
 
-#### [NEW] [api/models/](file:///c:/Users/longr/pricer/api/models/)
+#### [NEW] [api/models/](file:///c:/Users/longr/Projects/pricer/api/models/)
 
 Extract Pydantic models from main.py:
 - `requests.py` - Request models (PriceRequest, RiskRequest, etc.)
 - `responses.py` - Response models (PriceResponse, RiskResponse, etc.)
 - `config.py` - Configuration models (RunConfig, BumpConfig)
 
-#### [NEW] [api/middleware/](file:///c:/Users/longr/pricer/api/middleware/)
+#### [NEW] [api/middleware/](file:///c:/Users/longr/Projects/pricer/api/middleware/)
 
 Add middleware for:
 - `error_handler.py` - Centralized error handling
 - `logging.py` - Request/response logging
 - `timing.py` - Request timing metrics
 
-#### [MODIFY] [api/main.py](file:///c:/Users/longr/pricer/api/main.py)
+#### [MODIFY] [api/main.py](file:///c:/Users/longr/Projects/pricer/api/main.py)
 
 Refactor to use routers:
 ```python
@@ -220,7 +220,7 @@ app.include_router(market_data.router, prefix="/market-data", tags=["market-data
 
 Set up comprehensive code quality tools and pre-commit hooks.
 
-#### [NEW] [.pre-commit-config.yaml](file:///c:/Users/longr/pricer/.pre-commit-config.yaml)
+#### [NEW] [.pre-commit-config.yaml](file:///c:/Users/longr/Projects/pricer/.pre-commit-config.yaml)
 
 Configure pre-commit hooks:
 ```yaml
@@ -250,7 +250,7 @@ repos:
         args: [--strict]
 ```
 
-#### [NEW] [.github/workflows/ci.yml](file:///c:/Users/longr/pricer/.github/workflows/ci.yml)
+#### [NEW] [.github/workflows/ci.yml](file:///c:/Users/longr/Projects/pricer/.github/workflows/ci.yml)
 
 GitHub Actions CI pipeline:
 ```yaml
@@ -297,7 +297,7 @@ jobs:
           file: ./backend/coverage.xml
 ```
 
-#### [NEW] [.github/workflows/api-test.yml](file:///c:/Users/longr/pricer/.github/workflows/api-test.yml)
+#### [NEW] [.github/workflows/api-test.yml](file:///c:/Users/longr/Projects/pricer/.github/workflows/api-test.yml)
 
 API integration testing workflow:
 ```yaml
@@ -337,7 +337,7 @@ jobs:
 
 Add performance monitoring and optimization utilities.
 
-#### [NEW] [backend/src/pricer/utils/profiling.py](file:///c:/Users/longr/pricer/backend/src/pricer/utils/profiling.py)
+#### [NEW] [backend/src/pricer/utils/profiling.py](file:///c:/Users/longr/Projects/pricer/backend/src/pricer/utils/profiling.py)
 
 Performance profiling utilities:
 ```python
@@ -362,7 +362,7 @@ def profile_time(func: Callable) -> Callable:
     return wrapper
 ```
 
-#### [NEW] [backend/src/pricer/utils/memory.py](file:///c:/Users/longr/pricer/backend/src/pricer/utils/memory.py)
+#### [NEW] [backend/src/pricer/utils/memory.py](file:///c:/Users/longr/Projects/pricer/backend/src/pricer/utils/memory.py)
 
 Memory usage tracking utilities:
 ```python
@@ -402,7 +402,7 @@ def estimate_memory_usage(
 
 Improve developer experience with better tooling and documentation.
 
-#### [NEW] [.vscode/settings.json](file:///c:/Users/longr/pricer/.vscode/settings.json)
+#### [NEW] [.vscode/settings.json](file:///c:/Users/longr/Projects/pricer/.vscode/settings.json)
 
 VS Code workspace settings:
 ```json
@@ -431,7 +431,7 @@ VS Code workspace settings:
 }
 ```
 
-#### [NEW] [.vscode/launch.json](file:///c:/Users/longr/pricer/.vscode/launch.json)
+#### [NEW] [.vscode/launch.json](file:///c:/Users/longr/Projects/pricer/.vscode/launch.json)
 
 Debug configurations:
 ```json
@@ -459,7 +459,7 @@ Debug configurations:
 }
 ```
 
-#### [NEW] [Makefile](file:///c:/Users/longr/pricer/Makefile)
+#### [NEW] [Makefile](file:///c:/Users/longr/Projects/pricer/Makefile)
 
 Common development commands:
 ```makefile
@@ -499,14 +499,14 @@ dev-ui:
 
 Set up automated documentation generation.
 
-#### [NEW] [docs/api/](file:///c:/Users/longr/pricer/docs/api/)
+#### [NEW] [docs/api/](file:///c:/Users/longr/Projects/pricer/docs/api/)
 
 API documentation structure:
 - `endpoints.md` - Detailed endpoint documentation
 - `schemas.md` - Term sheet schema documentation
 - `examples.md` - Example requests and responses
 
-#### [NEW] [backend/docs/](file:///c:/Users/longr/pricer/backend/docs/)
+#### [NEW] [backend/docs/](file:///c:/Users/longr/Projects/pricer/backend/docs/)
 
 Backend documentation:
 - `pricing-engine.md` - Monte Carlo pricing engine details
