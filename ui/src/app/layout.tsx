@@ -1,9 +1,12 @@
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
-import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
     title: 'Structured Products Pricer',
     description: 'Price and analyze autocallable structured products with Monte Carlo simulation',
+}
+
+export const viewport: Viewport = {
     themeColor: '#0a0a0f',
 }
 
