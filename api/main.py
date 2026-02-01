@@ -61,6 +61,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://localhost:3001",
         "https://pricer-six.vercel.app",
         "https://*.vercel.app",
     ],

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import dynamic from 'next/dynamic';
-import { priceProduct, getExampleSchema, fetchMarketData, PriceResponse, RunConfig } from '@/api/client';
-import { Badge, Frame, GraveCard, MetricChip, PillButton, RatingBars, SearchBar, Tooltip, FormField } from '@/components/ui';
+import { fetchMarketData, getExampleSchema, priceProduct, PriceResponse, RunConfig } from '@/api/client';
 import { MarketSnapshot } from '@/components/MarketSnapshot';
+import { Badge, FormField, Frame, GraveCard, MetricChip, PillButton, RatingBars, SearchBar } from '@/components/ui';
+import dynamic from 'next/dynamic';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // Dynamic import Monaco to avoid SSR issues
 const MonacoEditor = dynamic(
@@ -239,18 +239,48 @@ export default function PricingPage() {
         });
     }, [activeCategory, searchTerm]);
 
-    // Load example on mount
+    // Backend status tracking
+    const [backendStatus, setBackendStatus] = useState<'connecting' | 'ready' | 'error'>('connecting');
+    const [retryCount, setRetryCount] = useState(0);
+
+    // Load example on mount with retry logic for cold backend
     useEffect(() => {
         let isMounted = true;
-        const loadExample = async () => {
+        let retryTimeout: NodeJS.Timeout;
+
+        const loadExample = async (attempt = 0) => {
+            if (!isMounted) return;
+            
             setFetchingData(true);
-            setError(null);
+            setBackendStatus('connecting');
+            
             try {
                 const schema = await getExampleSchema();
-                await refreshTermSheetWithMarketData(schema);
-            } catch (err: any) {
                 if (isMounted) {
-                    setError('Failed to load example: ' + err.message);
+                    setBackendStatus('ready');
+                    await refreshTermSheetWithMarketData(schema);
+                    setError(null);
+                }
+            } catch (err: any) {
+                if (!isMounted) return;
+                
+                // Check if it's a network/timeout error (backend waking up)
+                const isNetworkError = err.message?.includes('fetch') || 
+                                       err.message?.includes('network') ||
+                                       err.message?.includes('Failed to fetch');
+                
+                if (isNetworkError && attempt < 3) {
+                    // Retry with exponential backoff
+                    const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+                    setError(`⏳ Backend is waking up... retrying in ${delay / 1000}s (attempt ${attempt + 1}/3)`);
+                    setRetryCount(attempt + 1);
+                    retryTimeout = setTimeout(() => loadExample(attempt + 1), delay);
+                } else {
+                    setBackendStatus('error');
+                    const friendlyMessage = isNetworkError
+                        ? '🔄 Backend service is starting up. Please click "Load Example" to retry.'
+                        : err.message;
+                    setError('Failed to load example: ' + friendlyMessage);
                 }
             } finally {
                 if (isMounted) {
@@ -262,6 +292,7 @@ export default function PricingPage() {
         loadExample();
         return () => {
             isMounted = false;
+            if (retryTimeout) clearTimeout(retryTimeout);
         };
     }, []);
 
@@ -376,8 +407,15 @@ export default function PricingPage() {
         try {
             const parsed = JSON.parse(termSheet);
             await refreshTermSheetWithMarketData(parsed);
+            setBackendStatus('ready');
         } catch (err: any) {
-            setError('Failed to fetch market data: ' + err.message);
+            const isNetworkError = err.message?.includes('fetch') || 
+                                   err.message?.includes('network') ||
+                                   err.message?.includes('Failed to fetch');
+            const friendlyMessage = isNetworkError
+                ? '🔄 Backend service is starting up. Please try again in a few seconds.'
+                : err.message;
+            setError('Failed to fetch market data: ' + friendlyMessage);
         } finally {
             setFetchingData(false);
         }
