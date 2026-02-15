@@ -5,6 +5,33 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://pricer-api-o6kd.onrender.com';
 
+const DEFAULT_TIMEOUT = 30_000; // 30s for GET requests
+const LONG_TIMEOUT = 120_000;   // 120s for POST requests (simulation can take time)
+
+async function fetchWithTimeout(
+    url: string,
+    options: RequestInit & { timeout?: number } = {}
+): Promise<Response> {
+    const { timeout = DEFAULT_TIMEOUT, ...fetchOptions } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const response = await fetch(url, {
+            ...fetchOptions,
+            signal: controller.signal,
+        });
+        return response;
+    } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
+            throw new Error(`Request timed out after ${timeout / 1000}s — the backend may be starting up (Render free tier). Try again in ~30s.`);
+        }
+        throw err;
+    } finally {
+        clearTimeout(id);
+    }
+}
+
 // Types
 export interface RunConfig {
     paths: number;
@@ -74,13 +101,13 @@ export interface ApiError {
 
 // API Functions
 export async function healthCheck(): Promise<{ status: string; version: string }> {
-    const res = await fetch(`${API_BASE}/health`);
+    const res = await fetchWithTimeout(`${API_BASE}/health`);
     if (!res.ok) throw new Error('API not available');
     return res.json();
 }
 
 export async function getExampleSchema(): Promise<Record<string, unknown>> {
-    const res = await fetch(`${API_BASE}/schema`);
+    const res = await fetchWithTimeout(`${API_BASE}/schema`);
     if (!res.ok) throw new Error('Failed to fetch schema');
     return res.json();
 }
@@ -89,13 +116,14 @@ export async function priceProduct(
     termSheet: Record<string, unknown>,
     runConfig: RunConfig
 ): Promise<PriceResponse> {
-    const res = await fetch(`${API_BASE}/price`, {
+    const res = await fetchWithTimeout(`${API_BASE}/price`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             term_sheet: termSheet,
             run_config: runConfig,
         }),
+        timeout: LONG_TIMEOUT,
     });
 
     if (!res.ok) {
@@ -111,7 +139,7 @@ export async function analyzeRisk(
     runConfig: RunConfig,
     bumpConfig: BumpConfig
 ): Promise<RiskResponse> {
-    const res = await fetch(`${API_BASE}/risk`, {
+    const res = await fetchWithTimeout(`${API_BASE}/risk`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -119,6 +147,7 @@ export async function analyzeRisk(
             run_config: runConfig,
             bump_config: bumpConfig,
         }),
+        timeout: LONG_TIMEOUT,
     });
 
     if (!res.ok) {
@@ -148,7 +177,7 @@ export interface MarketDataResponse {
 
 export async function fetchMarketData(tickers: string[]): Promise<MarketDataResponse> {
     const tickerList = tickers.join(',');
-    const res = await fetch(`${API_BASE}/market-data?tickers=${encodeURIComponent(tickerList)}`);
+    const res = await fetchWithTimeout(`${API_BASE}/market-data?tickers=${encodeURIComponent(tickerList)}`);
 
     if (!res.ok) {
         const error = await res.json();
