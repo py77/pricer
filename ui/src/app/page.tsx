@@ -706,7 +706,6 @@ export default function PricingPage() {
                         <h1 className="page-title">Structured Products Pricer</h1>
                         <p className="page-description">Price structured products with high-contrast templates</p>
                     </div>
-                    <a className="btn" href="/risk">Risk</a>
                 </div>
                 <SearchBar
                     value={searchTerm}
@@ -750,28 +749,27 @@ export default function PricingPage() {
                                 <MetricChip label="Metric" value={instrument.metric} />
                                 <Badge>{instrument.badge}</Badge>
                             </div>
-                            <div className="card-footer">Hover for details</div>
                             <div className="card-ratings">
                                 <div className="rating-group">
                                     <span className="rating-label">
                                         <span className="rating-icon" aria-hidden />
-                                        Rebuild
+                                        Complexity
                                     </span>
-                                    <RatingBars value={instrument.ratings.rebuild} color="orange" label="Rebuild rating" />
+                                    <RatingBars value={instrument.ratings.rebuild} color="orange" label="Complexity rating" />
                                 </div>
                                 <div className="rating-group">
                                     <span className="rating-label">
                                         <span className="rating-icon" aria-hidden />
-                                        Scale
+                                        Liquidity
                                     </span>
-                                    <RatingBars value={instrument.ratings.scale} color="blue" label="Scale rating" />
+                                    <RatingBars value={instrument.ratings.scale} color="blue" label="Liquidity rating" />
                                 </div>
                                 <div className="rating-group">
                                     <span className="rating-label">
                                         <span className="rating-icon" aria-hidden />
-                                        Market
+                                        Demand
                                     </span>
-                                    <RatingBars value={instrument.ratings.market} color="orange" label="Market rating" />
+                                    <RatingBars value={instrument.ratings.market} color="orange" label="Demand rating" />
                                 </div>
                             </div>
                         </GraveCard>
@@ -786,45 +784,50 @@ export default function PricingPage() {
                 subtitle="Configure inputs and run pricing"
             >
                 <div className="controls-row">
-                    <div className="control-group">
-                        <label className="control-label" htmlFor="paths-input">Paths</label>
-                        <input
-                            id="paths-input"
-                            type="number"
-                            className="control-input"
-                            value={config.paths}
-                            onChange={e => setConfig({ ...config, paths: parseInt(e.target.value) || 10000 })}
-                        />
+                    <div className="controls-group">
+                        <div className="control-group">
+                            <label className="control-label" htmlFor="paths-input">Paths</label>
+                            <input
+                                id="paths-input"
+                                type="number"
+                                className="control-input"
+                                value={config.paths}
+                                onChange={e => setConfig({ ...config, paths: parseInt(e.target.value) || 10000 })}
+                            />
+                        </div>
+                        <div className="control-group">
+                            <label className="control-label" htmlFor="seed-input">Seed</label>
+                            <input
+                                id="seed-input"
+                                type="number"
+                                className="control-input"
+                                value={config.seed}
+                                onChange={e => setConfig({ ...config, seed: parseInt(e.target.value) || 42 })}
+                            />
+                        </div>
+                        <div className="control-group">
+                            <label className="control-label" htmlFor="block-input">Block Size</label>
+                            <input
+                                id="block-input"
+                                type="number"
+                                className="control-input"
+                                value={config.block_size}
+                                onChange={e => setConfig({ ...config, block_size: parseInt(e.target.value) || 50000 })}
+                            />
+                        </div>
                     </div>
-                    <div className="control-group">
-                        <label className="control-label" htmlFor="seed-input">Seed</label>
-                        <input
-                            id="seed-input"
-                            type="number"
-                            className="control-input"
-                            value={config.seed}
-                            onChange={e => setConfig({ ...config, seed: parseInt(e.target.value) || 42 })}
-                        />
+                    <div className="controls-group">
+                        <button className="btn" onClick={handleLoadExample}>
+                            Load Example
+                        </button>
+                        <button className="btn" onClick={handleFetchLiveData} disabled={fetchingData}>
+                            {fetchingData ? 'Fetching...' : 'Fetch Live Data'}
+                        </button>
+                        <button className="btn btn-primary" onClick={handleRunPricing} disabled={loading}>
+                            {loading && <span className="spinner-inline" />}
+                            {loading ? 'Running...' : 'Run Pricing'}
+                        </button>
                     </div>
-                    <div className="control-group">
-                        <label className="control-label" htmlFor="block-input">Block Size</label>
-                        <input
-                            id="block-input"
-                            type="number"
-                            className="control-input"
-                            value={config.block_size}
-                            onChange={e => setConfig({ ...config, block_size: parseInt(e.target.value) || 50000 })}
-                        />
-                    </div>
-                    <button className="btn" onClick={handleLoadExample}>
-                        Load Example
-                    </button>
-                    <button className="btn" onClick={handleFetchLiveData} disabled={fetchingData}>
-                        {fetchingData ? 'Fetching...' : 'Fetch Live Data'}
-                    </button>
-                    <button className="btn btn-primary" onClick={handleRunPricing} disabled={loading}>
-                        {loading ? 'Running...' : 'Run Pricing'}
-                    </button>
                 </div>
             </Frame>
 
@@ -1306,7 +1309,7 @@ export default function PricingPage() {
                                 <MonacoEditor
                                     height="320px"
                                     language="json"
-                                    theme="vs"
+                                    theme="vs-dark"
                                     value={termSheet}
                                     onChange={(value) => setTermSheet(value || '{}')}
                                     options={{
@@ -1418,16 +1421,32 @@ export default function PricingPage() {
                         </>
                     ) : (
                         <Frame title="Results" subtitle="Awaiting pricing run">
-                            <GraveCard>
-                                <div className="card-header">
-                                    <div className="card-title">No results yet</div>
-                                    <Badge>Waiting</Badge>
-                                </div>
-                                <p className="card-description">
-                                    Click run pricing to calculate PV, risk metrics, and cashflow projections.
+                            <div className="market-snapshot-empty">
+                                <div className="empty-title">Ready to price</div>
+                                <p className="empty-description">
+                                    Configure your term sheet, then click Run Pricing.
                                 </p>
-                                <div className="card-footer">Hover for details</div>
-                            </GraveCard>
+                                <ul className="empty-state-checklist">
+                                    <li>
+                                        <span className={`empty-state-check${selectedInstrumentId ? ' empty-state-check--done' : ''}`}>
+                                            {selectedInstrumentId ? '\u2713' : ''}
+                                        </span>
+                                        Instrument selected
+                                    </li>
+                                    <li>
+                                        <span className={`empty-state-check${(parsedTermSheet?.underlyings?.length > 0 && parsedTermSheet?.underlyings?.[0]?.id) ? ' empty-state-check--done' : ''}`}>
+                                            {(parsedTermSheet?.underlyings?.length > 0 && parsedTermSheet?.underlyings?.[0]?.id) ? '\u2713' : ''}
+                                        </span>
+                                        Underlyings configured
+                                    </li>
+                                    <li>
+                                        <span className={`empty-state-check${(parsedTermSheet?.schedules?.observation_dates?.length > 0) ? ' empty-state-check--done' : ''}`}>
+                                            {(parsedTermSheet?.schedules?.observation_dates?.length > 0) ? '\u2713' : ''}
+                                        </span>
+                                        Schedule defined
+                                    </li>
+                                </ul>
+                            </div>
                         </Frame>
                     )}
                 </div>

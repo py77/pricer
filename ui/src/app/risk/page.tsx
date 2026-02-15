@@ -87,80 +87,84 @@ export default function RiskPage() {
                         <h1 className="page-title">Risk Analysis</h1>
                         <p className="page-description">Calculate Greeks with CRN Monte Carlo</p>
                     </div>
-                    <a className="btn" href="/">Pricing</a>
                 </div>
             </div>
 
             {/* Controls */}
             <Frame title="Controls" subtitle="Run settings">
                 <div className="controls-row">
-                    <div className="control-group">
-                        <label className="control-label" htmlFor="risk-paths">Paths</label>
-                        <input
-                            id="risk-paths"
-                            type="number"
-                            className="control-input"
-                            value={runConfig.paths}
-                            onChange={e => setRunConfig({ ...runConfig, paths: parseInt(e.target.value) || 10000 })}
-                        />
+                    <div className="controls-group">
+                        <div className="control-group">
+                            <label className="control-label" htmlFor="risk-paths">Paths</label>
+                            <input
+                                id="risk-paths"
+                                type="number"
+                                className="control-input"
+                                value={runConfig.paths}
+                                onChange={e => setRunConfig({ ...runConfig, paths: parseInt(e.target.value) || 10000 })}
+                            />
+                        </div>
+                        <div className="control-group">
+                            <label className="control-label" htmlFor="risk-seed">Seed</label>
+                            <input
+                                id="risk-seed"
+                                type="number"
+                                className="control-input"
+                                value={runConfig.seed}
+                                onChange={e => setRunConfig({ ...runConfig, seed: parseInt(e.target.value) || 42 })}
+                            />
+                        </div>
+                        <div className="control-group">
+                            <label className="control-label" htmlFor="risk-block">Block Size</label>
+                            <input
+                                id="risk-block"
+                                type="number"
+                                className="control-input"
+                                value={runConfig.block_size}
+                                onChange={e => setRunConfig({ ...runConfig, block_size: parseInt(e.target.value) || 50000 })}
+                            />
+                        </div>
+                        <div className="control-group">
+                            <label className="control-label" htmlFor="risk-spot">Spot Bump</label>
+                            <input
+                                id="risk-spot"
+                                type="number"
+                                className="control-input"
+                                step="0.001"
+                                value={bumpConfig.spot_bump}
+                                onChange={e => setBumpConfig({ ...bumpConfig, spot_bump: parseFloat(e.target.value) || 0.01 })}
+                            />
+                        </div>
+                        <div className="control-group">
+                            <label className="control-label" htmlFor="risk-vol">Vol Bump</label>
+                            <input
+                                id="risk-vol"
+                                type="number"
+                                className="control-input"
+                                step="0.001"
+                                value={bumpConfig.vol_bump}
+                                onChange={e => setBumpConfig({ ...bumpConfig, vol_bump: parseFloat(e.target.value) || 0.01 })}
+                            />
+                        </div>
+                        <div className="checkbox-row">
+                            <input
+                                type="checkbox"
+                                id="include-rho"
+                                checked={bumpConfig.include_rho}
+                                onChange={e => setBumpConfig({ ...bumpConfig, include_rho: e.target.checked })}
+                            />
+                            <label htmlFor="include-rho">Include Rho</label>
+                        </div>
                     </div>
-                    <div className="control-group">
-                        <label className="control-label" htmlFor="risk-seed">Seed</label>
-                        <input
-                            id="risk-seed"
-                            type="number"
-                            className="control-input"
-                            value={runConfig.seed}
-                            onChange={e => setRunConfig({ ...runConfig, seed: parseInt(e.target.value) || 42 })}
-                        />
+                    <div className="controls-group">
+                        <button className="btn" onClick={handleLoadExample}>
+                            Load Example
+                        </button>
+                        <button className="btn btn-primary" onClick={handleRunRisk} disabled={loading}>
+                            {loading && <span className="spinner-inline" />}
+                            {loading ? 'Running...' : 'Run Risk'}
+                        </button>
                     </div>
-                    <div className="control-group">
-                        <label className="control-label" htmlFor="risk-block">Block Size</label>
-                        <input
-                            id="risk-block"
-                            type="number"
-                            className="control-input"
-                            value={runConfig.block_size}
-                            onChange={e => setRunConfig({ ...runConfig, block_size: parseInt(e.target.value) || 50000 })}
-                        />
-                    </div>
-                    <div className="control-group">
-                        <label className="control-label" htmlFor="risk-spot">Spot Bump</label>
-                        <input
-                            id="risk-spot"
-                            type="number"
-                            className="control-input"
-                            step="0.001"
-                            value={bumpConfig.spot_bump}
-                            onChange={e => setBumpConfig({ ...bumpConfig, spot_bump: parseFloat(e.target.value) || 0.01 })}
-                        />
-                    </div>
-                    <div className="control-group">
-                        <label className="control-label" htmlFor="risk-vol">Vol Bump</label>
-                        <input
-                            id="risk-vol"
-                            type="number"
-                            className="control-input"
-                            step="0.001"
-                            value={bumpConfig.vol_bump}
-                            onChange={e => setBumpConfig({ ...bumpConfig, vol_bump: parseFloat(e.target.value) || 0.01 })}
-                        />
-                    </div>
-                    <div className="checkbox-row">
-                        <input
-                            type="checkbox"
-                            id="include-rho"
-                            checked={bumpConfig.include_rho}
-                            onChange={e => setBumpConfig({ ...bumpConfig, include_rho: e.target.checked })}
-                        />
-                        <label htmlFor="include-rho">Include Rho</label>
-                    </div>
-                    <button className="btn" onClick={handleLoadExample}>
-                        Load Example
-                    </button>
-                    <button className="btn btn-primary" onClick={handleRunRisk} disabled={loading}>
-                        {loading ? 'Running...' : 'Run Risk'}
-                    </button>
                 </div>
             </Frame>
 
@@ -179,7 +183,7 @@ export default function RiskPage() {
                             <MonacoEditor
                                 height="100%"
                                 language="json"
-                                theme="vs"
+                                theme="vs-dark"
                                 value={termSheet}
                                 onChange={(value) => setTermSheet(value || '{}')}
                                 options={{
@@ -304,16 +308,28 @@ export default function RiskPage() {
                         </>
                     ) : (
                         <Frame title="Results" subtitle="Awaiting risk run">
-                            <GraveCard>
-                                <div className="card-header">
-                                    <div className="card-title">No results yet</div>
-                                    <Badge>Waiting</Badge>
-                                </div>
-                                <p className="card-description">
-                                    Click run risk to calculate Greeks and sensitivity analysis.
+                            <div className="market-snapshot-empty">
+                                <div className="empty-title">Ready to analyze</div>
+                                <p className="empty-description">
+                                    Edit the term sheet JSON and click Run Risk to compute sensitivities.
                                 </p>
-                                <div className="card-footer">Hover for details</div>
-                            </GraveCard>
+                                <ul className="empty-state-checklist">
+                                    <li>
+                                        <span className={`empty-state-check${parsedTermSheet ? ' empty-state-check--done' : ''}`}>
+                                            {parsedTermSheet ? '\u2713' : ''}
+                                        </span>
+                                        Valid term sheet JSON
+                                    </li>
+                                    <li>
+                                        <span className="empty-state-check">&nbsp;</span>
+                                        Delta &amp; Vega per underlying
+                                    </li>
+                                    <li>
+                                        <span className="empty-state-check">&nbsp;</span>
+                                        Rho (optional, enable above)
+                                    </li>
+                                </ul>
+                            </div>
                         </Frame>
                     )}
                 </div>

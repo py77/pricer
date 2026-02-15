@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { AppNav } from '@/components/AppNav'
 
 export const metadata: Metadata = {
     title: 'Structured Products Pricer',
@@ -26,6 +27,7 @@ export default function RootLayout({
                 />
             </head>
             <body>
+                <AppNav />
                 <main className="container app-main">
                     {children}
                 </main>
