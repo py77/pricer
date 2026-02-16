@@ -313,7 +313,7 @@ class PathGenerator:
         self.discrete_divs: Dict[int, Dict[int, float]] = {}
         
         for a_idx, underlying in enumerate(self.ts.underlyings):
-            if underlying.dividend_model.type == DividendModelType.DISCRETE:
+            if underlying.dividend_model.type in (DividendModelType.DISCRETE, DividendModelType.MIXED):
                 exdiv_schedule = get_exdiv_schedule_for_underlying(
                     self.grid, underlying.id
                 )

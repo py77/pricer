@@ -18,11 +18,9 @@ from pricer.products.schema import (
     VolModelType,
     DiscountCurve,
     Correlation,
-    Schedule,
-    Autocall,
-    KnockIn,
-    Coupon,
-    Redemption,
+    Schedules,
+    Payoff,
+    KnockInBarrier,
     BarrierMonitoringType,
     SettlementType,
     DayCountConvention,
@@ -130,28 +128,34 @@ def discount_curve() -> DiscountCurve:
 def correlation_matrix() -> Correlation:
     """Correlation matrix for multi-asset products."""
     return Correlation(
-        pairs={
-            ("AAPL", "GOOGL"): 0.6,
-            ("AAPL", "MSFT"): 0.7,
-            ("GOOGL", "MSFT"): 0.65,
+        pairwise={
+            "AAPL_GOOGL": 0.6,
+            "AAPL_MSFT": 0.7,
+            "GOOGL_MSFT": 0.65,
         }
     )
 
 
 @pytest.fixture
-def autocall_schedule(valuation_date: date, maturity_date: date) -> Schedule:
+def autocall_schedules(valuation_date: date, maturity_date: date) -> Schedules:
     """Standard quarterly autocall observation schedule."""
     obs_dates = []
     current = valuation_date + timedelta(days=90)  # First obs in 3 months
-    
+
     while current <= maturity_date:
         obs_dates.append(current)
         current += timedelta(days=90)  # Quarterly
-    
-    return Schedule(
-        valuation_date=valuation_date,
-        maturity_date=maturity_date,
+
+    # Payment dates 2 business days after observation
+    pay_dates = [d + timedelta(days=2) for d in obs_dates]
+    n = len(obs_dates)
+
+    return Schedules(
         observation_dates=obs_dates,
+        payment_dates=pay_dates,
+        autocall_levels=[1.0] * n,
+        coupon_barriers=[1.0] * n,
+        coupon_rates=[0.025] * n,  # 2.5% per quarter (~10% annual)
     )
 
 
@@ -161,38 +165,35 @@ def simple_autocall_term_sheet(
     maturity_date: date,
     single_asset_underlying: Underlying,
     discount_curve: DiscountCurve,
-    autocall_schedule: Schedule,
+    autocall_schedules: Schedules,
 ) -> TermSheet:
     """Simple single-asset autocall term sheet for basic testing."""
     return TermSheet(
         meta=Meta(
-            product_name="Simple Autocall",
-            product_type="autocall",
+            product_id="TEST-SIMPLE-001",
+            trade_date=valuation_date - timedelta(days=5),
             valuation_date=valuation_date,
+            settlement_date=valuation_date + timedelta(days=2),
             maturity_date=maturity_date,
-            notional=1_000_000.0,
+            maturity_payment_date=maturity_date + timedelta(days=2),
             currency="USD",
+            notional=1_000_000.0,
         ),
         underlyings=[single_asset_underlying],
         discount_curve=discount_curve,
         correlation=None,  # Single asset, no correlation needed
-        schedule=autocall_schedule,
-        autocall=Autocall(
-            barrier=1.0,  # 100% of initial
-            coupon=0.10,  # 10% coupon on autocall
-        ),
-        knock_in=KnockIn(
-            barrier=0.70,  # 70% knock-in barrier
+        schedules=autocall_schedules,
+        ki_barrier=KnockInBarrier(
+            level=0.70,  # 70% knock-in barrier
             monitoring=BarrierMonitoringType.CONTINUOUS,
         ),
-        coupon=Coupon(
-            barrier=1.0,  # 100% coupon barrier
-            rate=0.10,  # 10% per period
-            memory=True,
-        ),
-        redemption=Redemption(
-            type=SettlementType.CASH,
-            capital_protection=False,
+        payoff=Payoff(
+            worst_of=False,
+            coupon_memory=True,
+            coupon_on_autocall=True,
+            redemption_if_autocall=1.0,
+            redemption_if_no_ki=1.0,
+            redemption_if_ki="worst_performance",
         ),
     )
 
@@ -204,38 +205,35 @@ def worst_of_autocall_term_sheet(
     multi_asset_underlyings: list[Underlying],
     discount_curve: DiscountCurve,
     correlation_matrix: Correlation,
-    autocall_schedule: Schedule,
+    autocall_schedules: Schedules,
 ) -> TermSheet:
     """Worst-of multi-asset autocall term sheet for comprehensive testing."""
     return TermSheet(
         meta=Meta(
-            product_name="Worst-of Autocall",
-            product_type="autocall",
+            product_id="TEST-WOF-001",
+            trade_date=valuation_date - timedelta(days=5),
             valuation_date=valuation_date,
+            settlement_date=valuation_date + timedelta(days=2),
             maturity_date=maturity_date,
-            notional=1_000_000.0,
+            maturity_payment_date=maturity_date + timedelta(days=2),
             currency="USD",
+            notional=1_000_000.0,
         ),
         underlyings=multi_asset_underlyings,
         discount_curve=discount_curve,
         correlation=correlation_matrix,
-        schedule=autocall_schedule,
-        autocall=Autocall(
-            barrier=1.0,  # 100% of initial (worst-of)
-            coupon=0.12,  # 12% coupon on autocall
-        ),
-        knock_in=KnockIn(
-            barrier=0.65,  # 65% knock-in barrier (worst-of)
+        schedules=autocall_schedules,
+        ki_barrier=KnockInBarrier(
+            level=0.65,  # 65% knock-in barrier (worst-of)
             monitoring=BarrierMonitoringType.CONTINUOUS,
         ),
-        coupon=Coupon(
-            barrier=0.95,  # 95% coupon barrier (worst-of)
-            rate=0.08,  # 8% per period
-            memory=True,
-        ),
-        redemption=Redemption(
-            type=SettlementType.CASH,
-            capital_protection=False,
+        payoff=Payoff(
+            worst_of=True,
+            coupon_memory=True,
+            coupon_on_autocall=True,
+            redemption_if_autocall=1.0,
+            redemption_if_no_ki=1.0,
+            redemption_if_ki="worst_performance",
         ),
     )
 
@@ -292,7 +290,7 @@ def assert_greeks_reasonable(delta: float, vega: float, notional: float):
     """Assert that Greeks are within reasonable bounds."""
     # Delta should be between -notional and +notional
     assert abs(delta) <= notional, f"Delta {delta} exceeds notional {notional}"
-    
+
     # Vega should be positive and reasonable
     assert vega >= 0, f"Vega {vega} is negative"
     assert vega <= notional, f"Vega {vega} exceeds notional {notional}"

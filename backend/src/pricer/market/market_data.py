@@ -274,11 +274,80 @@ def fetch_risk_free_rate() -> float:
             return 0.05
 
 
+def _project_future_dividends(
+    ticker: str,
+    from_date: date,
+    to_date: date,
+    lookback_years: int = 2
+) -> List[DividendInfo]:
+    """
+    Project future dividends from historical payment pattern.
+
+    Looks at trailing history to detect payment frequency and amount,
+    then projects forward from the last known ex-date through to_date.
+
+    Args:
+        ticker: Stock ticker
+        from_date: Start date for projections
+        to_date: End date for projections
+        lookback_years: Years of history to analyze
+
+    Returns:
+        List of projected DividendInfo
+    """
+    _check_yfinance()
+
+    stock = yf.Ticker(ticker)
+    try:
+        divs = stock.dividends
+    except Exception:
+        return []
+
+    if divs.empty or len(divs) < 2:
+        return []
+
+    # Filter to trailing lookback_years
+    cutoff = from_date - timedelta(days=lookback_years * 365)
+    recent = []
+    for idx, amount in divs.items():
+        ex = idx.date() if hasattr(idx, 'date') else idx
+        if ex >= cutoff:
+            recent.append((ex, float(amount)))
+
+    if len(recent) < 2:
+        return []
+
+    # Detect frequency from median gap between consecutive payments
+    gaps = [(recent[i + 1][0] - recent[i][0]).days for i in range(len(recent) - 1)]
+    median_gap = sorted(gaps)[len(gaps) // 2]
+
+    # Classify: quarterly (~90d), semi-annual (~180d), annual (~365d)
+    if median_gap < 135:
+        freq_days = 91  # quarterly
+    elif median_gap < 270:
+        freq_days = 182  # semi-annual
+    else:
+        freq_days = 365  # annual
+
+    # Use most recent payment amount
+    last_date, last_amount = recent[-1]
+
+    # Project forward from last known ex-date
+    projected = []
+    next_date = last_date + timedelta(days=freq_days)
+    while next_date <= to_date:
+        if next_date >= from_date:
+            projected.append(DividendInfo(ex_date=next_date, amount=last_amount))
+        next_date += timedelta(days=freq_days)
+
+    return projected
+
+
 def fetch_market_data_snapshot(
     tickers: List[str],
     valuation_date: Optional[date] = None,
     maturity_date: Optional[date] = None,
-    vol_window: int = 30,
+    vol_window: int = 90,
     corr_window: int = 60
 ) -> MarketDataSnapshot:
     """
@@ -333,32 +402,43 @@ def fetch_market_data_snapshot(
                 vol_ts.append(VolInfo(date=current, vol=hist_vol))
         vol_ts.append(VolInfo(date=maturity_date, vol=hist_vol))
         
-        # Fetch dividends
+        # Fetch dividends (historical in future range, or project from history)
         divs = fetch_dividends(ticker, valuation_date, maturity_date)
+        if not divs:
+            divs = _project_future_dividends(ticker, valuation_date, maturity_date)
         
-        # Calculate dividend yield
+        # Calculate dividend yield using multi-strategy approach
         try:
             stock = yf.Ticker(ticker)
-            raw_div_yield = stock.info.get("dividendYield", 0) or 0
-            
-            # yfinance dividendYield is inconsistent:
-            # - Sometimes returns as decimal (0.0044 for 0.44%)
-            # - Sometimes returns as percentage-like (0.44 for 0.44%)
-            # Validate and normalize:
-            # - If > 0.15, it's likely already a ratio (15%+), which is unrealistic for most stocks
-            # - If > 1.0, it's definitely wrong (100%+ yield)
-            # - Cap at 10% (0.10) as a sanity check
+            info = stock.info
+
+            # Strategy 1 (primary): dividendRate / spot
+            # dividendRate is annual dividend per share in currency (e.g. $1.00)
+            dividend_rate = info.get("dividendRate", 0) or 0
+            computed_yield = dividend_rate / spot if (dividend_rate > 0 and spot > 0) else 0
+
+            # Strategy 2 (fallback): trailingAnnualDividendYield (already decimal)
+            trailing_yield = info.get("trailingAnnualDividendYield", 0) or 0
+
+            # Strategy 3 (last resort): dividendYield with minimal normalization
+            raw_div_yield = info.get("dividendYield", 0) or 0
             if raw_div_yield > 1.0:
-                # Clearly a percentage value (e.g., 40 for 40%), convert
-                div_yield = raw_div_yield / 100
-            elif raw_div_yield > 0.15:
-                # Suspiciously high, likely already percentage expressed as decimal
-                # Most stocks have < 5% yield, so > 15% is very rare
-                div_yield = raw_div_yield / 100
+                raw_div_yield = raw_div_yield / 100
+
+            # Pick best estimate
+            if computed_yield > 0:
+                div_yield = computed_yield
+            elif trailing_yield > 0:
+                div_yield = trailing_yield
             else:
                 div_yield = raw_div_yield
-            
-            # Safety cap at 10% - anything higher is likely an error
+
+            # Cross-validate: if we used a fallback but dividendRate is available,
+            # trust the computed value when they disagree by > 2%
+            if computed_yield > 0 and div_yield != computed_yield and abs(div_yield - computed_yield) > 0.02:
+                div_yield = computed_yield
+
+            # Safety cap at 10%
             div_yield = min(div_yield, 0.10)
         except:
             div_yield = 0
