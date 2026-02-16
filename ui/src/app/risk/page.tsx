@@ -181,7 +181,7 @@ export default function RiskPage() {
                         )}
                         <div className="editor-container">
                             <MonacoEditor
-                                height="100%"
+                                height="400px"
                                 language="json"
                                 theme="vs-dark"
                                 value={termSheet}
