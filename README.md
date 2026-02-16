@@ -20,37 +20,27 @@ Production-grade pricer for Autocallable structured products with Monte Carlo si
 ### Installation
 
 ```bash
-# 1. Install backend
+# 1. Install Python dependencies
+pip install -r requirements.txt
 pip install -e ./backend
 
-# 2. Install API dependencies
-pip install -e ./api
-
-# 3. Install UI dependencies
+# 2. Install UI dependencies
 cd ui && npm install
 ```
 
 ### Running Locally
 
 ```bash
-# Terminal 1: Start API server
-cd api
-uvicorn main:app --reload --port 8000
+# Terminal 1: Start API server (from repo root)
+uvicorn api.main:app --reload --port 8000
 
 # Terminal 2: Start UI
-cd ui
-npm run dev
+cd ui && npm run dev
 ```
 
 Then open:
 - **UI**: http://localhost:3000
 - **API Docs**: http://localhost:8000/docs
-
-### Using Docker Compose
-
-```bash
-docker-compose up
-```
 
 ## 📚 Documentation
 
@@ -105,12 +95,20 @@ See [Development Setup](docs/development/setup.md) for detailed instructions.
 | POST | `/price` | Price a product |
 | POST | `/risk` | Risk analysis with Greeks |
 | POST | `/vanilla/price` | Price vanilla options |
+| POST | `/vanilla/implied-vol` | Implied volatility |
 | GET | `/market-data` | Fetch market data |
 
 ## 🌐 Deployment
 
-- **API**: Deploy to Render using `render.yaml`
-- **UI**: Deploy to Vercel (auto-detected)
+- **API**: Google Cloud Run (`us-central1`). Deploy with:
+  ```bash
+  gcloud run deploy pricer-api \
+    --source . \
+    --dockerfile api/Dockerfile \
+    --region us-central1 \
+    --allow-unauthenticated
+  ```
+- **UI**: Vercel (auto-deploys on push to `main`, root directory set to `ui`)
 - **Production**: https://pricer-six.vercel.app
 
 ## 📄 License
