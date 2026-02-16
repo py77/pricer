@@ -3,7 +3,7 @@
  * Communicates with FastAPI server.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://pricer-api-o6kd.onrender.com';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://pricer-api-883624022691.us-central1.run.app';
 
 const DEFAULT_TIMEOUT = 30_000; // 30s for GET requests
 const LONG_TIMEOUT = 120_000;   // 120s for POST requests (simulation can take time)

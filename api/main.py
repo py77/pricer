@@ -64,6 +64,7 @@ app.add_middleware(
         "http://localhost:3001",
         "https://pricer-six.vercel.app",
         "https://*.vercel.app",
+        "https://pricer-api-883624022691.us-central1.run.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],

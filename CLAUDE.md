@@ -1,110 +1,124 @@
-# Pricer Project
+# CLAUDE.md
 
-A structured products pricer with Monte Carlo simulation for pricing autocallable products.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Structure
+## Project Overview
 
+A structured products pricer: Monte Carlo simulation engine for autocallable notes with a FastAPI backend and Next.js frontend.
+
+## Development Commands
+
+### Backend
+```bash
+pip install -r requirements.txt
+pip install -e ./backend              # Install pricer library as editable package
+
+# Run all tests
+cd backend && python -m pytest
+
+# Run a single test file
+cd backend && python -m pytest tests/test_pricing.py
+
+# Run a specific test
+cd backend && python -m pytest tests/test_pricing.py::test_name
+
+# Start API server locally
+uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
-pricer/
-├── backend/          # Python backend (FastAPI)
-├── api/              # API layer
-├── ui/               # Next.js 14 frontend (App Router)
-│   ├── src/
-│   │   ├── app/      # Next.js pages
-│   │   ├── components/ui/  # shadcn/ui components
-│   │   ├── lib/      # Utilities (utils.ts for cn() helper)
-│   │   └── api/      # API client
-│   └── package.json
-├── docs/             # Documentation
-└── vercel.json       # Vercel deployment config
-```
-
-## Development
 
 ### Frontend (ui/)
 ```bash
 cd ui
 npm install
-npm run dev        # Start dev server on localhost:3000
-npm run build      # Production build
+npm run dev          # Dev server on localhost:3000
+npm run build        # Production build
+npm run generate-types  # Generate TypeScript types from OpenAPI schema (requires local API running)
 ```
 
-### Backend (Python)
+### Linting (backend)
 ```bash
-# Use Python 3.11+
-pip install -r requirements.txt
+cd backend && ruff check src/    # Line length 100, target Python 3.11
 ```
+
+## Architecture
+
+### Two-Package Backend Structure
+
+The backend has two separate Python packages:
+- **`backend/`** — the `pricer` library (installed via `pip install -e ./backend`). Contains all pricing logic. Configured in `backend/pyproject.toml`.
+- **`api/`** — the FastAPI wrapper that imports from `pricer`. Configured in `api/pyproject.toml`. Entry point: `api/main.py`.
+
+On Cloud Run, the Dockerfile installs both: `pip install -r requirements.txt` then `pip install -e ./backend`.
+
+### Pricing Pipeline
+
+The core flow spans multiple files in `backend/src/pricer/`:
+
+```
+TermSheet (products/schema.py)
+    → build_simulation_grid (engines/grid.py)
+    → PathGenerator.generate (engines/path_generator.py)
+    → EventEngine.evaluate (pricers/event_engine.py)
+    → PricingResult
+```
+
+**AutocallPricer** (`pricers/autocall_pricer.py`) orchestrates this entire flow. `PricingConfig` controls num_paths, seed, antithetic, block_size.
+
+### Key Engine Details
+
+- **SimulationGrid** (`engines/grid.py`): Merges valuation, observation, ex-dividend, and maturity dates into a unified time grid with event type annotations.
+- **PathGenerator** (`engines/path_generator.py`): Correlated GBM via Cholesky decomposition. Supports piecewise constant vol, discrete dividends as spot jumps, Brownian bridge for continuous barrier monitoring, and QE (Quadratic Exponential) scheme for Heston-style LSV.
+- **EventEngine** (`pricers/event_engine.py`): At each observation date, evaluates in order: autocall check → coupon check → memory coupon update → maturity redemption (based on knock-in state).
+- **Greeks** (`risk/greeks.py`): Finite difference bumping with Common Random Numbers (CRN) — same seed for base and bumped scenarios. Supports central and forward differences for delta, vega, rho. Controlled by `BumpingConfig`.
+
+### Schema
+
+`TermSheet` (Pydantic, `extra = "forbid"`) is the single input model for pricing. Key nested models: Meta, Underlying (with VolModel and DividendModel), DiscountCurve, Correlation, Schedule, Autocall, KnockIn, Coupon, Redemption.
+
+### Frontend
+
+Next.js 14 App Router with two pages:
+- `/` — Pricing page
+- `/risk` — Risk analysis with Monaco editor for term sheet JSON, Greeks table, PV decomposition
+
+API client in `ui/src/api/client.ts` talks to the FastAPI backend. Base URL from `NEXT_PUBLIC_API_URL` env var, defaults to Cloud Run production URL.
+
+## API Endpoints
+
+- `GET /health` — Health check
+- `GET /schema` — Example term sheet
+- `POST /price` — Price a term sheet
+- `POST /risk` — Compute Greeks
+- `GET /market-data?tickers=AAPL,GOOG` — Fetch market data via yfinance
+- `POST /vanilla/price` — Vanilla option pricing
+- `POST /vanilla/implied-vol` — Implied volatility
+
+CORS origins configured in `api/main.py`: localhost:3000, localhost:3001, pricer-six.vercel.app, *.vercel.app.
 
 ## Deployment
 
-### GitHub
-```bash
-git add -A && git commit -m "message" && git push origin main
-```
-
-### Vercel
-- Project: `pricer` (https://vercel.com/py77s-projects/pricer)
-- **Root Directory**: Set to `ui` in Vercel project settings (Settings → Build and Deployment → Root Directory)
-- Deploys automatically on push to `main` branch
-
-## Key Configuration
-
-### Vercel Settings (IMPORTANT)
-- Root Directory must be set to `ui` because the Next.js app lives in a subfolder
-- Framework: Next.js (auto-detected)
-
-### .gitignore
-- Uses `/lib/` (not `lib/`) to only ignore root-level lib folder
-- This allows `ui/src/lib/` to be tracked (contains utils.ts)
-
-## Common Issues
-
-### "Cannot find module '@/lib/utils'"
-The `@/` path alias maps to `./src/*` in tsconfig.json. If this error occurs:
-1. Ensure `ui/src/lib/utils.ts` exists
-2. Ensure `.gitignore` uses `/lib/` not `lib/` (to avoid ignoring subdirectories)
-
-### Vercel build fails with "rootDirectory" error
-Don't put `rootDirectory` in vercel.json - set it in Vercel project settings instead.
-
-### Next.js deprecated themeColor warning
-Use `viewport` export instead of putting `themeColor` in `metadata`:
-```tsx
-export const viewport: Viewport = {
-    themeColor: '#0a0a0f',
-}
-```
-
-## Tech Stack
-
-- **Frontend**: Next.js 14.2.x, React 18, TailwindCSS, shadcn/ui
-- **Backend**: Python, FastAPI (deployed on Render)
-- **Deployment**: Vercel (frontend at https://pricer-six.vercel.app), Render (backend API)
+- **Frontend**: Vercel. Root Directory must be set to `ui` in Vercel project settings (not in vercel.json). Auto-deploys on push to `main`.
+- **Backend**: Google Cloud Run (us-central1). Dockerfile at `api/Dockerfile`. Deploy with:
+  ```bash
+  gcloud run deploy pricer-api \
+    --source . \
+    --dockerfile api/Dockerfile \
+    --region us-central1 \
+    --allow-unauthenticated \
+    --memory 1Gi \
+    --timeout 120 \
+    --min-instances 0 \
+    --max-instances 3
+  ```
+  The Dockerfile installs all deps from `requirements.txt`, then installs the `pricer` package as editable. Cloud Run injects `$PORT` env var; the CMD uses shell form to expand it.
 
 ## UI Theme
 
-The UI uses a **minimalist dark theme** with:
-- Dark slate/charcoal background (#0c0d10)
-- Teal accent color (#2dd4bf)
-- DM Sans font from Google Fonts
-- Clean, solid colors (no gradients or glow effects)
+Minimalist dark theme: background #0c0d10, teal accent #2dd4bf, DM Sans font, no gradients/glow.
 
-## Backend API
+## Gotchas
 
-- **Production URL**: https://pricer-api-o6kd.onrender.com
-- **Health check**: GET /health
-- **Example schema**: GET /schema
-- **Pricing**: POST /price
-- **Market data**: GET /market-data?tickers=AAPL,GOOG
-
-### CORS Configuration
-The backend allows origins:
-- http://localhost:3000
-- http://localhost:3001
-- https://pricer-six.vercel.app
-- https://*.vercel.app
-
-If adding new frontend URLs, update CORS in `api/main.py` and redeploy to Render.
-
-### Cold Start
-Render free tier may take ~30s to wake up. The frontend has retry logic with exponential backoff for this.
+- `.gitignore` uses `/lib/` (not `lib/`) to only ignore root-level lib — `ui/src/lib/` must be tracked.
+- Don't put `rootDirectory` in vercel.json — set it in Vercel project settings.
+- `@/` path alias in tsconfig maps to `./src/*`.
+- Cloud Run Dockerfile handles PYTHONPATH via `pip install -e ./backend`.
