@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/pyproject.toml backend/
 COPY backend/src backend/src
+COPY backend/examples backend/examples
 RUN pip install --no-cache-dir -e ./backend
 
 COPY api/ api/
